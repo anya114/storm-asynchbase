@@ -9,8 +9,9 @@ import org.hbase.async.AtomicIncrementRequest;
 import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
 import org.hbase.async.PutRequest;
-import storm.asynchbase.utils.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -38,10 +39,13 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     private String tableField;
     private String columnFamilyField;
     private String columnQualifierField;
+    private String columnQualifiersField;
     private List<String> columnQualifierFields;
     private String rowKeyField;
     private String valueField;
+    private String valuesField;
     private List<String> valueFields;
+    private String mapField;
     private String incrementField;
     private String timestampField;
 
@@ -88,7 +92,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                     }
                     break;
                 }
-                if (this.values != null || this.valueFields != null) {
+                if (this.values != null || this.valuesField != null || this.valueFields != null ) {
                     if (this.columnQualifiers == null && this.columnQualifierFields == null) {
                         throw new InvalidMapperException("Missing column qualifiers");
                     }
@@ -96,6 +100,14 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                         this.constructor = Constructor.VALUES_WITH_TIMESTAMP;
                     } else {
                         this.constructor = Constructor.VALUES;
+                    }
+                    break;
+                }
+                if (this.mapField != null){
+                    if (this.timestamp > 0 || this.timestampField != null) {
+                        this.constructor = Constructor.MAP_WITH_TIMESTAMP;
+                    } else {
+                        this.constructor = Constructor.MAP;
                     }
                     break;
                 }
@@ -124,7 +136,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                     }
                     break;
                 }
-                if (this.columnQualifiers != null || this.columnQualifierFields != null) {
+                if (this.columnQualifiers != null || this.columnQualifiersField != null || this.columnQualifierFields != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
                         throw new InvalidMapperException("Missing column family");
                     }
@@ -157,7 +169,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                     this.constructor = Constructor.CELL;
                     break;
                 }
-                if (this.columnQualifiers != null || this.columnQualifierFields != null) {
+                if (this.columnQualifiers != null || this.columnQualifiersField != null || this.columnQualifierFields != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
                         throw new InvalidMapperException("Missing column family");
                     }
@@ -218,6 +230,27 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                     this.getColumnFamily(tuple),
                     this.getColumnQualifiers(tuple),
                     this.getValues(tuple),
+                    this.getTimestamp(tuple)
+                );
+                break;
+            case MAP:
+                byte[][][] values = this.getQualifiersAndValues(tuple);
+                req = new PutRequest(
+                    this.getTable(tuple),
+                    this.getRowKey(tuple),
+                    this.getColumnFamily(tuple),
+                    values[0],
+                    values[1]
+                );
+                break;
+            case MAP_WITH_TIMESTAMP:
+                byte[][][] values2 = this.getQualifiersAndValues(tuple);
+                req = new PutRequest(
+                    this.getTable(tuple),
+                    this.getRowKey(tuple),
+                    this.getColumnFamily(tuple),
+                    values2[0],
+                    values2[1],
                     this.getTimestamp(tuple)
                 );
                 break;
@@ -448,6 +481,57 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     }
 
     /**
+     * @param rowKey Rowkey to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setRowKey(Object rowKey) {
+        if (this.rowKeySerializer != null) {
+            this.rowKey = this.columnQualifierSerializer.serialize(rowKey);
+        } else {
+            this.rowKey = ((String) rowKey).getBytes();
+        }
+
+        return this;
+    }
+
+    /**
+     * @param rowKeyField Name of the tuple fields containing the
+     *                    row key to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setRowKeyField(String rowKeyField) {
+        this.rowKeyField = rowKeyField;
+        return this;
+    }
+
+    /**
+     * @param serializer An AsyncHBaseSerializer to use to transform the row key to
+     *                   byte array.<br/>
+     *                   Note that if you used a constant value ( setRowKey )
+     *                   you have to provide the serializer befor so that the serialization
+     *                   is done only once.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setRowKeySerializer(AsyncHBaseSerializer serializer) {
+        this.rowKeySerializer = serializer;
+        return this;
+    }
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return Row key as a byte array.
+     */
+    public byte[] getRowKey(Tuple tuple) {
+        if (this.rowKeyField == null) {
+            return this.rowKey;
+        }
+        if (this.rowKeySerializer != null) {
+            return this.rowKeySerializer.serialize(tuple.getValueByField(this.rowKeyField));
+        }
+        return tuple.getStringByField(this.rowKeyField).getBytes();
+    }
+
+    /**
      * @param columnFamily Column family to use.
      * @return This so you can do method chaining.
      */
@@ -577,75 +661,48 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     }
 
     /**
+     * @param columnQualifiersField Name of the tuple fields containing a
+     *                              list of column qualifiers to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setColumnQualifiersField(String columnQualifiersField) {
+        this.columnQualifiersField = columnQualifiersField;
+        return this;
+    }
+
+    /**
      * @param tuple The storm tuple to process.
      * @return Column qualifiers as an array of byte array.
      */
     public byte[][] getColumnQualifiers(Tuple tuple) {
-        if (this.columnQualifierFields == null) {
+        if (this.columnQualifiersField != null) {
+            ArrayList<Object> tupleValues = (ArrayList<Object>) tuple.getValueByField(this.columnQualifiersField);
+            byte[][] qualifiers = new byte[tupleValues.size()][];
+            if (this.columnQualifierSerializer != null) {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    qualifiers[i] = this.valueSerializer.serialize(tupleValues.get(i));
+                }
+            } else {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    qualifiers[i] = ((String)tupleValues.get(i)).getBytes();
+                }
+            }
+            return qualifiers;
+        } else if (this.columnQualifierFields != null) {
+            byte[][] qualifiers = new byte[this.columnQualifierFields.size()][];
+            if (this.columnQualifierSerializer != null) {
+                for (int i = 0; i < this.columnQualifierFields.size(); i++) {
+                    qualifiers[i] = this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierFields.get(i)));
+                }
+            } else {
+                for (int i = 0; i < this.columnQualifierFields.size(); i++) {
+                    qualifiers[i] = tuple.getStringByField(this.columnQualifierFields.get(i)).getBytes();
+                }
+            }
+            return qualifiers;
+        } else {
             return this.columnQualifiers;
         }
-        byte[][] qualifiers = new byte[this.columnQualifierFields.size()][];
-        if (this.columnQualifierSerializer != null) {
-            for (int i = 0; i < this.columnQualifierFields.size(); i++) {
-                qualifiers[i] = this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierFields.get(i)));
-            }
-        } else {
-            for (int i = 0; i < this.columnQualifierFields.size(); i++) {
-                qualifiers[i] = tuple.getStringByField(this.columnQualifierFields.get(i)).getBytes();
-            }
-        }
-        return qualifiers;
-    }
-
-    /**
-     * @param rowKey Rowkey to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseFieldMapper setRowKey(Object rowKey) {
-        if (this.rowKeySerializer != null) {
-            this.rowKey = this.columnQualifierSerializer.serialize(rowKey);
-        } else {
-            this.rowKey = ((String) rowKey).getBytes();
-        }
-
-        return this;
-    }
-
-    /**
-     * @param rowKeyField Name of the tuple fields containing the
-     *                    row key to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseFieldMapper setRowKeyField(String rowKeyField) {
-        this.rowKeyField = rowKeyField;
-        return this;
-    }
-
-    /**
-     * @param serializer An AsyncHBaseSerializer to use to transform the row key to
-     *                   byte array.<br/>
-     *                   Note that if you used a constant value ( setRowKey )
-     *                   you have to provide the serializer befor so that the serialization
-     *                   is done only once.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseFieldMapper setRowKeySerializer(AsyncHBaseSerializer serializer) {
-        this.rowKeySerializer = serializer;
-        return this;
-    }
-
-    /**
-     * @param tuple The storm tuple to process.
-     * @return Row key as a byte array.
-     */
-    public byte[] getRowKey(Tuple tuple) {
-        if (this.rowKeyField == null) {
-            return this.rowKey;
-        }
-        if (this.rowKeySerializer != null) {
-            return this.rowKeySerializer.serialize(tuple.getValueByField(this.rowKeyField));
-        }
-        return tuple.getStringByField(this.rowKeyField).getBytes();
     }
 
     /**
@@ -702,7 +759,6 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
      * @param values List of cell values to use.
      * @return This so you can do method chaining.
      */
@@ -722,7 +778,17 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
+     * @param valuesField Name of the tuple field containing a
+     *                    list of values.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setValuesField(String valuesField) {
+        this.valuesField = valuesField;
+        return this;
+    }
+
+    /**
+     * Note : Values are mapped to qualifiers in order.
      * @param valueFields Name of the tuple fields containing the
      *                    cell values to use.
      * @return This so you can do method chaining.
@@ -734,25 +800,100 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
      * @param tuple The storm tuple to process.
      * @return Cell values as an array of byte array.
      */
     public byte[][] getValues(Tuple tuple) {
-        if (this.valueFields == null) {
+        if (this.valuesField != null) {
+            ArrayList<Object> tupleValues = (ArrayList<Object>) tuple.getValueByField(this.valuesField);
+            byte[][] values = new byte[tupleValues.size()][];
+            if (this.valueSerializer != null) {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    values[i] = this.valueSerializer.serialize(tupleValues.get(i));
+                }
+            } else {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    values[i] = ((String)tupleValues.get(i)).getBytes();
+                }
+            }
+            return values;
+        } else if( this.valueFields != null) {
+            byte[][] values = new byte[this.valueFields.size()][];
+            if (this.valueSerializer != null) {
+                for (int i = 0; i < this.valueFields.size(); i++) {
+                    values[i] = this.valueSerializer.serialize(tuple.getValueByField(this.valueFields.get(i)));
+                }
+            } else {
+                for (int i = 0; i < this.valueFields.size(); i++) {
+                    values[i] = tuple.getStringByField(this.valueFields.get(i)).getBytes();
+                }
+            }
+            return values;
+        } else {
             return this.values;
         }
-        byte[][] values = new byte[this.valueFields.size()][];
-        if (this.valueSerializer != null) {
-            for (int i = 0; i < this.valueFields.size(); i++) {
-                values[i] = this.valueSerializer.serialize(tuple.getValueByField(this.valueFields.get(i)));
+    }
+
+    /**
+     * @param map ColumnQualifiers / values map.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setMap(Map<Object,Object> map) {
+        this.columnQualifiers = new byte[map.size()][];
+        this.values = new byte[map.size()][];
+        int i = 0;
+        for (Map.Entry<Object,Object> item : map.entrySet()){
+            if (this.columnQualifierSerializer != null) {
+                columnQualifiers[i] = this.columnQualifierSerializer.serialize(item.getKey());
+            } else {
+                columnQualifiers[i] = ((String)item.getKey()).getBytes();
             }
-        } else {
-            for (int i = 0; i < this.valueFields.size(); i++) {
-                values[i] = tuple.getStringByField(this.valueFields.get(i)).getBytes();
+            if (this.valueSerializer != null) {
+                values[i] = this.valueSerializer.serialize(item.getValue());
+            } else {
+                values[i] = ((String)item.getValue()).getBytes();
             }
+            i++;
         }
-        return values;
+        return this;
+    }
+
+    /**
+     * @param mapField Name of the tuple field containing a
+     *                 columnQualifier / value Map.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setMapField(String mapField) {
+        this.mapField = mapField;
+        return this;
+    }
+
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return index 0 - Array of byte array of qualifiers
+     *         index 1 - Array of byte array of values
+     */
+    public byte[][][] getQualifiersAndValues(Tuple tuple) {
+        byte[][][] qualifiersAndValues = new byte[2][][];
+        Map<Object,Object> map = (Map<Object,Object>) tuple.getValueByField(this.mapField);
+        qualifiersAndValues[0] = new byte[map.size()][];
+        qualifiersAndValues[1] = new byte[map.size()][];
+        int i = 0;
+        for (Map.Entry<Object,Object> item : map.entrySet()){
+            if (this.columnQualifierSerializer != null) {
+                qualifiersAndValues[0][i] = this.columnQualifierSerializer.serialize(item.getKey());
+            } else {
+                qualifiersAndValues[0][i] = ((String)item.getKey()).getBytes();
+            }
+            if (this.valueSerializer != null) {
+                qualifiersAndValues[1][i] = this.valueSerializer.serialize(item.getValue());
+            } else {
+                qualifiersAndValues[1][i] = ((String)item.getValue()).getBytes();
+            }
+            i++;
+        }
+        return qualifiersAndValues;
     }
 
     /**
@@ -903,8 +1044,12 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         VALUE_WITH_TIMESTAMP,
         VALUES,
         VALUES_WITH_TIMESTAMP,
+        MAP,
+        MAP_WITH_TIMESTAMP,
         CELL,
         CELL_WITH_TIMESTAMP,
+        DYNAMIC_CELL,
+        DYNAMIC_CELL_WITH_TIMESTAMP,
         CELLS,
         CELLS_WITH_TIMESTAMP,
         FAMILY,

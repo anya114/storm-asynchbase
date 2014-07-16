@@ -23,10 +23,10 @@ public class RandomKeyValueSpout extends BaseRichSpout {
     public static Logger log = LoggerFactory.getLogger(RandomKeyValueSpout.class);
     SpoutOutputCollector collector;
 
-    List<Object> keys;
-    List<Object> values;
-    int sleep = -1;
-    Random generator;
+    protected List<Object> keys;
+    protected List<Object> values;
+    protected int sleep = -1;
+    protected Random generator;
 
     public RandomKeyValueSpout() {
     }

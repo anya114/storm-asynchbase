@@ -1,3 +1,7 @@
+/*
+ * Charles-Antoine Mathieu <charles-antoine.mathieu@ovh.net>
+ */
+
 package storm.asynchbase.bolt;
 
 import backtype.storm.task.OutputCollector;
@@ -10,7 +14,7 @@ import backtype.storm.tuple.Values;
 import org.hbase.async.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import storm.asynchbase.utils.AsyncHBaseDeserializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseDeserializer;
 
 import java.util.ArrayList;
 import java.util.List;

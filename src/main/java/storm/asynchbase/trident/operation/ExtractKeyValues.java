@@ -8,7 +8,7 @@ import backtype.storm.tuple.Values;
 import org.hbase.async.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import storm.asynchbase.utils.AsyncHBaseDeserializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseDeserializer;
 import storm.trident.operation.BaseFunction;
 import storm.trident.operation.TridentCollector;
 import storm.trident.operation.TridentOperationContext;

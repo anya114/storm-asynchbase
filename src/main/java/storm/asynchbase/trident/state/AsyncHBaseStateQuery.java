@@ -6,13 +6,11 @@ package storm.asynchbase.trident.state;
 
 import backtype.storm.topology.FailedException;
 import backtype.storm.tuple.Values;
-import com.stumbleupon.async.Callback;
 import com.stumbleupon.async.Deferred;
 import org.hbase.async.KeyValue;
-import org.hbase.async.PleaseThrottleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import storm.asynchbase.utils.AsyncHBaseDeserializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseDeserializer;
 import storm.trident.operation.TridentCollector;
 import storm.trident.operation.TridentOperationContext;
 import storm.trident.state.BaseQueryFunction;

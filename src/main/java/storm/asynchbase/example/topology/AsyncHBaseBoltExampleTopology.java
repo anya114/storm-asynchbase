@@ -20,18 +20,21 @@ import storm.asynchbase.bolt.mapper.AsyncHBaseFieldMapper;
 import storm.asynchbase.bolt.mapper.AsyncHBaseMapper;
 import storm.asynchbase.bolt.mapper.IAsyncHBaseMapper;
 import storm.asynchbase.example.spout.RandomKeyValueSpout;
-import storm.asynchbase.utils.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * <p>
  * Fill an HBase table with a fixed 1KB payload.
  * RandomKeyValueSpout emit random rowKey/qualifier
  * as fast as possible.
  * <p/>
+ * <p>
  * You'll have to set hBaseConfig and to tweak parallel hints and config
  * to match your configuration.
+ * </p>
  */
 public class AsyncHBaseBoltExampleTopology {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseBoltExampleTopology.class);

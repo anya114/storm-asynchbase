@@ -7,3 +7,4 @@ storm.asynchbase.trident.mapper
 storm.asynchbase.trident.operation
 storm.asynchbase.trident.state
 storm.asynchbase.utils
+storm.asynchbase.utils.serializer

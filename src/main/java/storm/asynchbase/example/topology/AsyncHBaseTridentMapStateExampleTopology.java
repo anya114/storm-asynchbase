@@ -15,7 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.asynchbase.example.spout.RandomKeyValueBatchSpout;
 import storm.asynchbase.trident.state.AsyncHBaseMapState;
-import storm.asynchbase.utils.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
 import storm.trident.Stream;
 import storm.trident.TridentState;
 import storm.trident.TridentTopology;

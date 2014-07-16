@@ -8,7 +8,7 @@ import org.hbase.async.AtomicIncrementRequest;
 import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
 import org.hbase.async.PutRequest;
-import storm.asynchbase.utils.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
 import storm.trident.tuple.TridentTuple;
 
 import java.util.List;
