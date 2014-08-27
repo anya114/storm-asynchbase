@@ -68,53 +68,48 @@ public class AsyncHBaseTridentExampleTopology {
 
         TridentTopology topology = new TridentTopology();
 
-        IAsyncHBaseTridentMapper mapper = new AsyncHBaseTridentMapper()
+        IAsyncHBaseTridentMapper saveMapper = new AsyncHBaseTridentMapper()
             // Insert a random value in a random column of a fixed row.
-            .addFieldMapper("save", new AsyncHBaseTridentFieldMapper()
+            .addFieldMapper(new AsyncHBaseTridentFieldMapper()
                 .setTable("test")
                 .setColumnFamily("data")
                 .setColumnQualifierField("key")
                 .setRowKey("key")
                 .setValueField("value")
                 .setValueSerializer(new IntSerializer())
-                .setBufferable(false))
+                .setBufferable(false));
 
-                // Get all value of the row.
-            .addFieldMapper("get values", new AsyncHBaseTridentFieldMapper()
+        IAsyncHBaseTridentMapper getMapper = new AsyncHBaseTridentMapper()
+            // Get all value of the row.
+            .addFieldMapper(new AsyncHBaseTridentFieldMapper()
                 .setRpcType(IAsyncHBaseTridentFieldMapper.Type.GET)
                 .setTable("test")
-                .setRowKey("key"))
+                .setRowKey("key"));
 
-                // Wipe the row.
-            .addFieldMapper("clean", new AsyncHBaseTridentFieldMapper()
+        IAsyncHBaseTridentMapper resetMapper = new AsyncHBaseTridentMapper()
+            // Wipe the row.
+            .addFieldMapper(new AsyncHBaseTridentFieldMapper()
                 .setRpcType(IAsyncHBaseTridentFieldMapper.Type.DELETE)
                 .setTable("test")
                 .setColumnFamily("data")
                 .setRowKey("key"))
-
-                // Increase drpc counter.
-            .addFieldMapper("incr", new AsyncHBaseTridentFieldMapper()
+            // Increase drpc counter.
+            .addFieldMapper(new AsyncHBaseTridentFieldMapper()
                     .setRpcType(IAsyncHBaseTridentFieldMapper.Type.INCR)
                     .setTable("test")
                     .setColumnFamily("data")
                     .setColumnQualifier("drpc-counter")
                     .setRowKey("counters")
-                    .setIncrement(1)
-            );
+                    .setIncrement(1));
 
         Stream stream = topology.newStream("stream", new RandomKeyValueBatchSpout(10).setSleep(1000)).parallelismHint(5);
 
         stream
-            .each(new Fields("key", "value"), new ExecuteHBaseRpcs("hbase-cluster", mapper, "save"), new Fields("")).parallelismHint(10)
+            .each(new Fields("key", "value"), new ExecuteHBaseRpcs("hbase-cluster", saveMapper), new Fields("")).parallelismHint(10)
             .each(new Fields("key", "value"), new Debug());
 
-        ArrayList<String> drpcRequests = new ArrayList<>();
-        drpcRequests.add("clean");
-        drpcRequests.add("incr");
-
-
         topology.newDRPCStream("average-drpc", drpc)
-            .each(new Fields("args"), new ExecuteHBaseRpcs("hbase-cluster", mapper, "get values").setAsync(false), new Fields("values"))
+            .each(new Fields("args"), new ExecuteHBaseRpcs("hbase-cluster", getMapper).setAsync(false), new Fields("values"))
             .each(
                 new Fields("values"),
                 new ExtractKeyValues(false, false, false, true, false)
@@ -122,7 +117,7 @@ public class AsyncHBaseTridentExampleTopology {
                 new Fields("value"))
             .aggregate(new Fields("value"), new AverageAggregator(), new Fields("average"))
             .each(new Fields("average"), new Debug())
-            .each(new Fields(), new ExecuteHBaseRpcs("hbase-cluster", mapper, drpcRequests), new Fields(""));
+            .each(new Fields(), new ExecuteHBaseRpcs("hbase-cluster", resetMapper), new Fields(""));
         ;
 
         return topology.build();

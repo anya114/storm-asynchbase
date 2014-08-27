@@ -8,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -17,37 +16,26 @@ import java.util.Map;
  */
 public class AsyncHBaseMapper implements IAsyncHBaseMapper {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseMapper.class);
-    private Map<String, IAsyncHBaseFieldMapper> asyncHBaseFieldMappers;
+    private List<IAsyncHBaseFieldMapper> fieldMappers;
 
     /**
-     * @param name                  Name of the RPC.<br/> Note: use unique names.
      * @param asyncHBaseFieldMapper Field mapper used to map tuple fields to RPC settings.
      * @return This so you can do method chaining.
      */
-    public AsyncHBaseMapper addFieldMapper(String name, IAsyncHBaseFieldMapper asyncHBaseFieldMapper) {
-        if (this.asyncHBaseFieldMappers == null) {
-            this.asyncHBaseFieldMappers = new HashMap<>();
+    public AsyncHBaseMapper addFieldMapper(IAsyncHBaseFieldMapper asyncHBaseFieldMapper) {
+        if (this.fieldMappers == null) {
+            this.fieldMappers = new ArrayList<>();
         }
-        this.asyncHBaseFieldMappers.put(name, asyncHBaseFieldMapper);
+        this.fieldMappers.add(asyncHBaseFieldMapper);
         return this;
     }
 
     /**
-     * @param names Names of the RPC to execute. If null it will return
-     *              all available mappers.
      * @return List of mappers/RPCs to execute.
      */
     @Override
-    public List<IAsyncHBaseFieldMapper> getFieldMappers(List<String> names) {
-        if (names != null) {
-            List<IAsyncHBaseFieldMapper> mappers = new ArrayList<>(names.size());
-            for (String name : names) {
-                mappers.add(asyncHBaseFieldMappers.get(name));
-            }
-            return mappers;
-        } else {
-            return new ArrayList<>(asyncHBaseFieldMappers.values());
-        }
+    public List<IAsyncHBaseFieldMapper> getFieldMappers() {
+        return fieldMappers;
     }
 
     /**
@@ -60,7 +48,7 @@ public class AsyncHBaseMapper implements IAsyncHBaseMapper {
      */
     @Override
     public void prepare(Map conf) {
-        for (IAsyncHBaseFieldMapper mapper : this.asyncHBaseFieldMappers.values()) {
+        for (IAsyncHBaseFieldMapper mapper : this.fieldMappers) {
             mapper.prepare(conf);
         }
     }

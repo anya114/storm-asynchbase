@@ -95,7 +95,7 @@ public class AsyncHBaseBoltMapExampleTopology {
         builder.setSpout("spout", myRandomKeyValueSpout, 1);
 
         IAsyncHBaseMapper mapper = new AsyncHBaseMapper()
-            .addFieldMapper("save", new AsyncHBaseFieldMapper()
+            .addFieldMapper(new AsyncHBaseFieldMapper()
                     .setTable("test2")
                     .setRowKeyField("key")
                     .setColumnFamily("data")
@@ -105,7 +105,7 @@ public class AsyncHBaseBoltMapExampleTopology {
 
         builder.setBolt(
             "hbase-bolt",
-            new AsyncHBaseBolt("hbase-cluster", mapper, "save"),
+            new AsyncHBaseBolt("hbase-cluster", mapper),
             5).noneGrouping("spout");
 
         return builder.createTopology();

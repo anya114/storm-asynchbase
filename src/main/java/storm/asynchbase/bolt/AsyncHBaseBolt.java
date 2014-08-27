@@ -22,7 +22,6 @@ import storm.asynchbase.bolt.mapper.IAsyncHBaseMapper;
 import storm.asynchbase.utils.AsyncHBaseClientFactory;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -63,10 +62,7 @@ import java.util.Map;
  * Results :<br/>
  * This bolt will emit a tuple containing the RPCs results in the same order the
  * mapper returned the RPCs.<br/>
- * AsyncHBaseMapper return the requests in the same order
- * you provided names, but as it use a HashMap to store fields mappers it will return
- * all requests in an undefined order if you don't provide names. Feel free
- * to write you own mapper implementation.
+ * AsyncHBaseMapper return the requests in the same order you added fieldMappers
  * </p>
  * <p>
  * Look at storm.asynchbase.example.topology.AsyncHBaseBoltExampleTopology for a
@@ -77,7 +73,6 @@ public class AsyncHBaseBolt implements IRichBolt {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseBolt.class);
     private final String cluster;
     private final IAsyncHBaseMapper mapper;
-    private final List<String> names;
     Callback<ArrayList<Object>, ArrayList<Object>> successCallback;
     Callback<Object, Exception> errorCallback;
     private Errback errback;
@@ -90,23 +85,10 @@ public class AsyncHBaseBolt implements IRichBolt {
     /**
      * @param cluster Cluster name to get the right AsyncHBase client.
      * @param mapper  Mapper containing all RPC configuration.
-     * @param names   List of RPCs to execute.
      */
-    public AsyncHBaseBolt(String cluster, IAsyncHBaseMapper mapper, List<String> names) {
+    public AsyncHBaseBolt(String cluster, IAsyncHBaseMapper mapper) {
         this.cluster = cluster;
         this.mapper = mapper;
-        this.names = names;
-    }
-
-    /**
-     * @param cluster Cluster name to get the right AsyncHBase client.
-     * @param mapper  Mapper containing all RPC configuration.
-     * @param name    Name of the single RPC to execute.
-     */
-    public AsyncHBaseBolt(String cluster, IAsyncHBaseMapper mapper, String name) {
-        this.cluster = cluster;
-        this.mapper = mapper;
-        this.names = Collections.singletonList(name);
     }
 
     /**
@@ -156,8 +138,9 @@ public class AsyncHBaseBolt implements IRichBolt {
 
     @Override
     public void execute(final Tuple tuple) {
-        ArrayList<Deferred<Object>> requests = new ArrayList<>(names.size());
-        for (IAsyncHBaseFieldMapper fieldMapper : mapper.getFieldMappers(names)) {
+        List<IAsyncHBaseFieldMapper> mappers = mapper.getFieldMappers();
+        ArrayList<Deferred<Object>> requests = new ArrayList<>(mappers.size());
+        for (IAsyncHBaseFieldMapper fieldMapper : mappers) {
             switch (fieldMapper.getRpcType()) {
                 case PUT:
                     requests.add(

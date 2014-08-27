@@ -80,7 +80,7 @@ public class AsyncHBaseBoltExampleTopology {
         String payload = new String(new char[1024]).replace('\0', 'x');
 
         IAsyncHBaseMapper mapper = new AsyncHBaseMapper()
-            .addFieldMapper("save", new AsyncHBaseFieldMapper()
+            .addFieldMapper(new AsyncHBaseFieldMapper()
                     .setTable("test")
                     .setRowKeyField("key")
                     .setColumnFamily("data")
@@ -91,7 +91,7 @@ public class AsyncHBaseBoltExampleTopology {
 
         builder.setBolt(
             "hbase-bolt",
-            new AsyncHBaseBolt("hbase-cluster", mapper, "save"),
+            new AsyncHBaseBolt("hbase-cluster", mapper),
             5).noneGrouping("spout");
 
         return builder.createTopology();

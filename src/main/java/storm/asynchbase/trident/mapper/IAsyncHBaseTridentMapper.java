@@ -14,11 +14,9 @@ import java.util.Map;
 public interface IAsyncHBaseTridentMapper extends Serializable {
 
     /**
-     * @param names Names of the RPC to execute. If null it should return
-     *              all available mappers.
      * @return List of mappers/RPCs to execute.
      */
-    List<IAsyncHBaseTridentFieldMapper> getFieldMappers(List<String> names);
+    List<IAsyncHBaseTridentFieldMapper> getFieldMappers();
 
     /**
      * <p>

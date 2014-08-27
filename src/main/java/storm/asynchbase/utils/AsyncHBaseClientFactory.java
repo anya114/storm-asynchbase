@@ -98,6 +98,7 @@ public class AsyncHBaseClientFactory {
             HBaseClient client = hBaseClientMap.get(name);
             if (client != null) {
                 client.shutdown();
+                hBaseClientMap.remove(client);
             } else {
                 log.error("AsyncHBase client " + name + " not found");
             }

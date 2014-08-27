@@ -9,16 +9,14 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This interface holds several fields mappers ( RPC configuration ) by name
+ * This interface holds several fields mappers ( RPC configuration )
  */
 public interface IAsyncHBaseMapper extends Serializable {
 
     /**
-     * @param names Names of the RPC to execute. If null it should return
-     *              all available mappers.
      * @return List of mappers/RPCs to execute.
      */
-    List<IAsyncHBaseFieldMapper> getFieldMappers(List<String> names);
+    List<IAsyncHBaseFieldMapper> getFieldMappers();
 
     /**
      * <p>

@@ -77,7 +77,6 @@ public class ExecuteHBaseRpcs extends BaseFunction {
 
     private final String cluster;
     private final IAsyncHBaseTridentMapper mapper;
-    private final List<String> names;
     public FailStrategy failStrategy = FailStrategy.LOG;
     Callback<ArrayList<Object>, ArrayList<Object>> successCallback;
     Callback<Object, Exception> errorCallback;
@@ -90,21 +89,10 @@ public class ExecuteHBaseRpcs extends BaseFunction {
     /**
      * @param cluster Cluster name to get the right AsyncHBase client.
      * @param mapper  Mapper containing all RPC configuration.
-     * @param names   List of RPCs to execute.
      */
-    public ExecuteHBaseRpcs(String cluster, IAsyncHBaseTridentMapper mapper, List<String> names) {
+    public ExecuteHBaseRpcs(String cluster, IAsyncHBaseTridentMapper mapper) {
         this.cluster = cluster;
         this.mapper = mapper;
-        this.names = names;
-    }
-
-    /**
-     * @param cluster Cluster name to get the right AsyncHBase client.
-     * @param mapper  Mapper containing all RPC configuration.
-     * @param name    Name of the single RPC to execute.
-     */
-    public ExecuteHBaseRpcs(String cluster, IAsyncHBaseTridentMapper mapper, String name) {
-        this(cluster, mapper, Collections.singletonList(name));
     }
 
     /**
@@ -179,8 +167,9 @@ public class ExecuteHBaseRpcs extends BaseFunction {
 
     @Override
     public void execute(final TridentTuple tuple, final TridentCollector collector) {
-        List<Deferred<Object>> requests = new ArrayList<>(names.size());
-        for (IAsyncHBaseTridentFieldMapper fieldMapper : mapper.getFieldMappers(names)) {
+        List<IAsyncHBaseTridentFieldMapper> mappers = this.mapper.getFieldMappers();
+        List<Deferred<Object>> requests = new ArrayList<>(mappers.size());
+        for (IAsyncHBaseTridentFieldMapper fieldMapper : mappers) {
             switch (fieldMapper.getRpcType()) {
                 case PUT:
                     requests.add(client.put(fieldMapper.getPutRequest(tuple)));
