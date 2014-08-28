@@ -4,9 +4,9 @@
 
 package storm.asynchbase.utils.serializer;
 
-    import java.util.Map;
+import java.util.Map;
 
-public class ByteArraySerializer implements AsyncHBaseSerializer, AsyncHBaseDeserializer{
+public class ByteArraySerializer implements AsyncHBaseSerializer, AsyncHBaseDeserializer {
     @Override
     public Object deserialize(byte[] value) {
         return value;

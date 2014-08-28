@@ -73,8 +73,6 @@ public class AsyncHBaseBolt implements IRichBolt {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseBolt.class);
     private final String cluster;
     private final IAsyncHBaseMapper mapper;
-    Callback<ArrayList<Object>, ArrayList<Object>> successCallback;
-    Callback<Object, Exception> errorCallback;
     private Errback errback;
     private HBaseClient client;
     private OutputCollector collector;
@@ -89,24 +87,6 @@ public class AsyncHBaseBolt implements IRichBolt {
     public AsyncHBaseBolt(String cluster, IAsyncHBaseMapper mapper) {
         this.cluster = cluster;
         this.mapper = mapper;
-    }
-
-    /**
-     * @param callback Add a success callback between RPC return and tuple ack/emit.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseBolt addCallback(Callback<ArrayList<Object>, ArrayList<Object>> callback) {
-        this.successCallback = callback;
-        return this;
-    }
-
-    /**
-     * @param errback Add an error callback between RPC return and tuple failure.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseBolt addErrback(Callback<Object, Exception> errback) {
-        this.errorCallback = errback;
-        return this;
     }
 
     /**
@@ -180,14 +160,6 @@ public class AsyncHBaseBolt implements IRichBolt {
         }
 
         Deferred<ArrayList<Object>> results = Deferred.groupInOrder(requests);
-
-        if (this.successCallback != null) {
-            results = results.addCallback(this.successCallback);
-        }
-
-        if (this.errorCallback != null) {
-            results = results.addErrback(this.errorCallback);
-        }
 
         if (throttle) {
             log.warn("Throttling...");
@@ -271,7 +243,7 @@ public class AsyncHBaseBolt implements IRichBolt {
                 throttle = true;
                 return null;
             }
-            log.warn("hbase exception " + ex.toString());
+
             return ex;
         }
     }

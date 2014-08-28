@@ -4,6 +4,7 @@
 
 package storm.asynchbase.utils.serializer;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -11,7 +12,7 @@ import java.util.Map;
  * capable of returning a specific object type
  * from a byte array fetched from HBase.
  */
-public interface AsyncHBaseDeserializer {
+public interface AsyncHBaseDeserializer extends Serializable {
 
     /**
      * @param value Byte array from HBase.
