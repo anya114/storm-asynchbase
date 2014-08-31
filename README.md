@@ -47,7 +47,7 @@ format input values to a specific type.
 
 ```
     IAsyncHBaseMapper mapper = new AsyncHBaseMapper()
-                .addFieldMapper("save", new AsyncHBaseFieldMapper()
+                .addFieldMapper(new AsyncHBaseFieldMapper()
                         .setTable("test")
                         .setRowKeyField("key")
                         .setColumnFamily("data")
@@ -67,7 +67,7 @@ does.
 ```
     builder.setBolt(
             "hbase-bolt",
-            new AsyncHBaseBolt("hbase-cluster", mapper, "save"),
+            new AsyncHBaseBolt("hbase-cluster", mapper),
             5).noneGrouping("spout");
 ```
 

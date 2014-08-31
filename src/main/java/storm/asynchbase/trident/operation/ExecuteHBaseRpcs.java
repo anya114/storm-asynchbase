@@ -62,10 +62,8 @@ import java.util.Map;
  * Results :<br/>
  * This function will emit a tuple containing the RPCs results in the same order the
  * mapper returned the RPCs.<br/>
- * AsyncHBaseMapper return the requests in the same order
- * you provided names, but as it use a HashMap to store fields mappers it will return
- * all requests in an undefined order if you don't provide names. Feel free
- * to write you own mapper implementation.
+ * AsyncHBaseMapper will emit a a tuple containing the RPCs results in
+ * the same order the mapper returned the RPCs.
  * </p>
  * <p>
  * Look at storm.asynchbase.example.topology.AsyncHBaseTridentExampleTopology for a
