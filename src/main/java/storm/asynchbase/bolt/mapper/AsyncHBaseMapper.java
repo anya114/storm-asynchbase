@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This class holds several fields mappers ( RPC configuration ) by name
+ * This class holds several fields mappers ( RPC configuration )
  */
 public class AsyncHBaseMapper implements IAsyncHBaseMapper {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseMapper.class);

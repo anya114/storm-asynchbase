@@ -62,16 +62,8 @@ public class AsyncHBaseTridentStateExampleTopology {
             }
         }
 
-        /**
-         * Topology
-         */
-
         TridentTopology topology = new TridentTopology();
         Stream stream = topology.newStream("stream", new RandomKeyValueBatchSpout(10).setSleep(100)).parallelismHint(5);
-
-        /**
-         * Stream rate aggregator
-         */
 
         AsyncHBaseState.Options streamRateOptions = new AsyncHBaseState.Options();
         streamRateOptions.cluster = "hbase-cluster";
@@ -92,12 +84,12 @@ public class AsyncHBaseTridentStateExampleTopology {
             .setRowKey("global rate");
 
         TridentState streamRate = stream
-            .aggregate(new Fields(), new StreamRateAggregator(2), new Fields("rate")).parallelismHint(10)
+            .aggregate(new Fields(), new StreamRateAggregator(2), new Fields("rate"))
             .partitionPersist(
                 new AsyncHBaseStateFactory(streamRateOptions),
                 new Fields("rate"),
                 new AsyncHBaseStateUpdater()
-            ).parallelismHint(10);
+            ).parallelismHint(5);
 
         topology.newDRPCStream("stream rate drpc", drpc)
             .stateQuery(
@@ -112,7 +104,7 @@ public class AsyncHBaseTridentStateExampleTopology {
 
     public static void main(String[] args) throws Exception {
         Config conf = new Config();
-        conf.setMaxSpoutPending(5);
+        conf.setMaxSpoutPending(50);
 
         Map<String, String> hBaseConfig = new HashMap<>();
         hBaseConfig.put("zkQuorum", "node-00113.hadoop.ovh.net,node-00114.hadoop.ovh.net,node-00116.hadoop.ovh.net");

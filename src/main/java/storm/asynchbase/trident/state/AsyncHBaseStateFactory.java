@@ -24,13 +24,15 @@ public class AsyncHBaseStateFactory implements StateFactory {
     }
 
     /**
+     * <p>
      * Factory method to create a AsyncHBaseState object
+     * </p>
      *
-     * @param conf           topology configuration
-     * @param metrics        metrics helper
-     * @param partitionIndex partition index handled by this state
-     * @param numPartitions  number of partition to handle
-     * @return An initialized AsyncHBaseState
+     * @param conf           topology configuration.
+     * @param metrics        metrics helper.
+     * @param partitionIndex partition index handled by this state.
+     * @param numPartitions  number of partition to handle.
+     * @return An initialized AsyncHBaseState.
      */
     @Override
     public State makeState(Map conf, IMetricsContext metrics, int partitionIndex, int numPartitions) {

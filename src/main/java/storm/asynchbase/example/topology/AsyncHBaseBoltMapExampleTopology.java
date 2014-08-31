@@ -40,55 +40,49 @@ public class AsyncHBaseBoltMapExampleTopology {
     public static StormTopology buildTopology() {
 
         class PrinterBolt extends BaseBasicBolt {
+            private int mapSize = 10;
+
             @Override
             public void declareOutputFields(OutputFieldsDeclarer declarer) {
             }
+        }
+
+        class IntegerSerializer implements AsyncHBaseSerializer {
 
             @Override
             public void execute(Tuple tuple, BasicOutputCollector collector) {
                 log.info(tuple.toString());
             }
-        }
 
-        class IntegerSerializer implements AsyncHBaseSerializer {
             @Override
             public byte[] serialize(Object object) {
                 return Integer.toString((int) object).getBytes();
             }
+        }
+
+        class MyRandomKeyValueSpout extends RandomKeyValueSpout {
 
             @Override
             public void prepare(Map conf) {
 
             }
-        }
 
-        class MyRandomKeyValueSpout extends RandomKeyValueSpout{
-            private int mapSize = 10;
-
-            public MyRandomKeyValueSpout setMapSize(int mapSize){
+            public MyRandomKeyValueSpout setMapSize(int mapSize) {
                 this.mapSize = mapSize;
                 return this;
             }
 
             @Override
             public Object nextValue() {
-                Map<Object,Object> map = new HashMap<>(mapSize);
-                for (int i = 0 ; i < mapSize ; i++){
-                    map.put(super.nextKey(),super.nextValue());
+                Map<Object, Object> map = new HashMap<>(mapSize);
+                for (int i = 0; i < mapSize; i++) {
+                    map.put(super.nextKey(), super.nextValue());
                 }
                 return map;
             }
         }
 
-        /**
-         * Random KeyValue generator
-         **/
-
         RandomKeyValueSpout myRandomKeyValueSpout = new MyRandomKeyValueSpout().setSleep(200);
-
-        /**
-         * Topology
-         */
 
         TopologyBuilder builder = new TopologyBuilder();
 

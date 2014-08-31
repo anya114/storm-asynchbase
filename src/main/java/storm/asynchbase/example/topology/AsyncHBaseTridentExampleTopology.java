@@ -26,7 +26,6 @@ import storm.trident.Stream;
 import storm.trident.TridentTopology;
 import storm.trident.operation.builtin.Debug;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -62,10 +61,6 @@ public class AsyncHBaseTridentExampleTopology {
             }
         }
 
-        /**
-         * Topology
-         */
-
         TridentTopology topology = new TridentTopology();
 
         IAsyncHBaseTridentMapper saveMapper = new AsyncHBaseTridentMapper()
@@ -93,14 +88,14 @@ public class AsyncHBaseTridentExampleTopology {
                 .setTable("test")
                 .setColumnFamily("data")
                 .setRowKey("key"))
-            // Increase drpc counter.
+                // Increase drpc counter.
             .addFieldMapper(new AsyncHBaseTridentFieldMapper()
-                    .setRpcType(IAsyncHBaseTridentFieldMapper.Type.INCR)
-                    .setTable("test")
-                    .setColumnFamily("data")
-                    .setColumnQualifier("drpc-counter")
-                    .setRowKey("counters")
-                    .setIncrement(1));
+                .setRpcType(IAsyncHBaseTridentFieldMapper.Type.INCR)
+                .setTable("test")
+                .setColumnFamily("data")
+                .setColumnQualifier("drpc-counter")
+                .setRowKey("counters")
+                .setIncrement(1));
 
         Stream stream = topology.newStream("stream", new RandomKeyValueBatchSpout(10).setSleep(1000)).parallelismHint(5);
 

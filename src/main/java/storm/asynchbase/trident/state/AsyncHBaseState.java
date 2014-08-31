@@ -5,7 +5,6 @@
 package storm.asynchbase.trident.state;
 
 import backtype.storm.topology.FailedException;
-import com.stumbleupon.async.Callback;
 import com.stumbleupon.async.Deferred;
 import org.hbase.async.HBaseClient;
 import org.hbase.async.KeyValue;
@@ -43,8 +42,8 @@ public class AsyncHBaseState implements State {
     private final Options options;
 
     /**
-     * @param options
-     * @param conf
+     * @param options AsyncHBaseState options.
+     * @param conf    Topology configuration.
      */
     public AsyncHBaseState(Options options, Map conf) {
         this.options = options;
@@ -62,7 +61,7 @@ public class AsyncHBaseState implements State {
             results.add(this.client.put(this.options.updateMapper.getPutRequest(tuple)));
         }
 
-        try{
+        try {
             Deferred.group(results).joinUninterruptibly(this.options.timeout);
         } catch (Exception ex) {
             this.handleFailure(ex);
@@ -130,7 +129,7 @@ public class AsyncHBaseState implements State {
      */
     public static class Options implements Serializable {
         public String cluster;
-        public long timeout=0;
+        public long timeout = 0;
         public IAsyncHBaseTridentFieldMapper updateMapper;
         public IAsyncHBaseTridentFieldMapper queryMapper;
         public FailStrategy failStrategy = FailStrategy.LOG;

@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * <p>
- * This bold execute one or more HBase RPC using the AsyncHBase client<br/>
+ * This bold executes one or more HBase RPC using the AsyncHBase client<br/>
  * </p>
  * <p>
  * You have to provide some AsyncHBase fields mappers to map tuple fields
@@ -42,7 +42,7 @@ import java.util.Map;
  * thread ( this is the default behaviour of storm ).<br/>
  * You may make the bolt synchronous by calling setAsync(false) but of course it's
  * killing performance.<br/>
- * Note : Even in synchronous mode multiple RPCs will run in a parallel.
+ * Note : Even in synchronous mode multiple RPCs will run in parallel.
  * </p>
  * <p>
  * Throttling :<br/>

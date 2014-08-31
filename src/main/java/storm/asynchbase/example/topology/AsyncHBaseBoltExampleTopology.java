@@ -64,15 +64,7 @@ public class AsyncHBaseBoltExampleTopology {
             }
         }
 
-        /**
-         * Random KeyValue generator
-         **/
-
         RandomKeyValueSpout randomKeyValueSpout = new RandomKeyValueSpout();
-
-        /**
-         * Topology
-         */
 
         TopologyBuilder builder = new TopologyBuilder();
 

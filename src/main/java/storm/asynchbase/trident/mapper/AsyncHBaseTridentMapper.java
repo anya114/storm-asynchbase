@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * This class holds several fields mappers ( RPC configuration ) by name
+ * This class holds several fields mappers ( RPC configuration )
  */
 public class AsyncHBaseTridentMapper implements IAsyncHBaseTridentMapper {
     private List<IAsyncHBaseTridentFieldMapper> fieldMappers;

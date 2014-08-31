@@ -63,17 +63,10 @@ public class AsyncHBaseTridentMapStateExampleTopology {
             }
         }
 
-        /**
-         * Topology
-         */
 
         TridentTopology topology = new TridentTopology();
 
         Stream stream = topology.newStream("stream", new MyRandomKeyValueBatchSpout().setKeys(new Values("foo", "bar", "baz")));
-
-        /**
-         * Partition sum
-         */
 
         AsyncHBaseMapState.Options sumStateOptions = new AsyncHBaseMapState.Options<TransactionalValue>();
         sumStateOptions.cluster = "hbase-cluster";
@@ -87,7 +80,7 @@ public class AsyncHBaseTridentMapStateExampleTopology {
 
         sumState
             .newValuesStream()
-            .each(new Fields("key","sum"), new Debug());
+            .each(new Fields("key", "sum"), new Debug());
 
         topology.newDRPCStream("sum-drpc", drpc)
             .stateQuery(sumState, new Fields("args"), new MapGet(), new Fields("sum"));

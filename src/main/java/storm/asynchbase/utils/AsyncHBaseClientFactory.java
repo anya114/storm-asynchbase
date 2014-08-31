@@ -51,7 +51,7 @@ public class AsyncHBaseClientFactory {
      *
      * @param config Topology config.
      * @param name   HBaseClient to return.
-     * @return The registered HBaseClient.
+     * @return Topology config key.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public synchronized static HBaseClient getHBaseClient(Map config, String name) {

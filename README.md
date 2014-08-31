@@ -20,6 +20,7 @@ flush interval if you care about latency. This connector
 tries to provide flexibility and high performance, the non-blocking
 fashion should reduce pressure on both Storm and HBase.
 I suggest you to read the javadoc for all more detailed information.
+http://javadoc.root.gg/storm-asynchbase
 
 Usage
 -----
@@ -85,14 +86,14 @@ specific type.
 
  * Trident Operations  
 ExecuteHBaseRpcs is a Trident function that mimic the behaviour of the
-ExtractKeyValuesBolt in a trident topology.
+AsyncHBaseBolt in a trident topology.
 
 ```
     .each(new Fields("args"), new ExecuteHBaseRpcs("hbase-cluster", mapper, "get values").setAsync(false), new Fields("values"))    
 ```
 
 ExtractKeyValues is a Trident function that mimic the behaviour of the
-AsyncHBaseBolt in a trident topology.
+ExtractKeyValuesBolt in a trident topology.
 
 ```
     .each(
@@ -104,7 +105,7 @@ AsyncHBaseBolt in a trident topology.
 
  * Trident State  
 This is a TridentState implementation to persist a partition to HBase using AsyncHBase client.
-It should be used with the partition persist 
+It should be used with the partition persist method.
 You should only use this state if your update is idempotent regarding batch replay. Use the
 AsyncHBaseStateUpdater / AsyncHBaseStateQuery and AsyncHBaseStateFactory to interact with it.
 You have to provide mappers for update and(or) query function.
@@ -112,7 +113,8 @@ You have to provide mappers for update and(or) query function.
 ```
     AsyncHBaseState.Options streamRateOptions = new AsyncHBaseState.Options();
     streamRateOptions.cluster = "hbase-cluster";
-    
+```
+```
     streamRateOptions.updateMapper = new AsyncHBaseTridentFieldMapper()
          .setTable("test")
          .setColumnFamily("data")
@@ -120,14 +122,16 @@ You have to provide mappers for update and(or) query function.
          .setRowKey("global rate")
          .setValueField("rate")
          .setValueSerializer(new AsyncHBaseLongSerializer());
-         
+```
+```
     streamRateOptions.queryMapper = new AsyncHBaseTridentFieldMapper()
          .setRpcType(IAsyncHBaseTridentFieldMapper.Type.GET)
          .setTable("test")
          .setColumnFamily("data")
          .setColumnQualifier("stream rate")
          .setRowKey("global rate");
-    
+```
+```
     TridentState streamRate = stream
             .aggregate(new Fields(), new StreamRateAggregator(2), new Fields("rate"))
             .partitionPersist(
@@ -135,7 +139,8 @@ You have to provide mappers for update and(or) query function.
                 new Fields("rate"),
                 new AsyncHBaseStateUpdater()
             );
-    
+```
+```
     topology.newDRPCStream("stream rate drpc", drpc)
         .stateQuery(
             streamRate,
@@ -155,7 +160,6 @@ NON-TRANSACTIONAL, TRANSACTIONAL and OPAQUE modes.
         sumStateOptions.table = "test";
         sumStateOptions.columnFamily = "data";
         sumStateOptions.columnQualifier = "total";
-        
     TridentState sumState = stream
                 .groupBy(new Fields("key"))
                 .persistentAggregate(
@@ -165,3 +169,8 @@ NON-TRANSACTIONAL, TRANSACTIONAL and OPAQUE modes.
                     new Fields("sum"))
                     .parallelismHint(10);
 ```
+
+TODO
+----
+
+ * Handle scan requests to get data from HBase to Storm

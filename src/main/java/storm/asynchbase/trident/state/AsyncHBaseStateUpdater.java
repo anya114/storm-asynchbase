@@ -13,7 +13,7 @@ import storm.trident.tuple.TridentTuple;
 import java.util.List;
 
 /**
- * Update an AsyncHBaseStateUpdater<br/>
+ * Update an AsyncHBaseState<br/>
  * Use this function with Stream.partitionAggregate(State,Aggregator,StateUpdater,...)
  */
 public class AsyncHBaseStateUpdater extends BaseStateUpdater<AsyncHBaseState> {
