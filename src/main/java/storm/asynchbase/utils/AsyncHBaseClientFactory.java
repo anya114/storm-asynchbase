@@ -59,6 +59,10 @@ public class AsyncHBaseClientFactory {
 
         if (client == null) {
             Map<String, String> conf = (Map<String, String>) config.get(name);
+            if (conf == null) {
+                throw new RuntimeException("Missing configuration for AsyncHBase client : " + name);
+            }
+
             String zkQuorum = conf.get("zkQuorum");
             String zkPath = conf.get("zkPath");
             String flushInterval = conf.get("flushInterval");
