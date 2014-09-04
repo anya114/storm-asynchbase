@@ -54,7 +54,7 @@ public class AsyncHBaseClientFactory {
      * @return Topology config key.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public synchronized static HBaseClient getHBaseClient(Map config, String name) throws Exception {
+    public synchronized static HBaseClient getHBaseClient(Map config, String name) {
         HBaseClient client = hBaseClientMap.get(name);
 
         if (client == null) {
