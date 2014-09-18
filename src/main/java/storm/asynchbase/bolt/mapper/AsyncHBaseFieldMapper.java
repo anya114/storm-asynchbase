@@ -9,7 +9,9 @@ import org.hbase.async.AtomicIncrementRequest;
 import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
 import org.hbase.async.PutRequest;
+import storm.asynchbase.utils.serializer.AsyncHBaseIncrementSerializer;
 import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseTimestampSerializer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,6 +55,8 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     private AsyncHBaseSerializer columnQualifierSerializer;
     private AsyncHBaseSerializer rowKeySerializer;
     private AsyncHBaseSerializer valueSerializer;
+    private AsyncHBaseIncrementSerializer incrementSerializer;
+    private AsyncHBaseTimestampSerializer timestampSerializer;
 
     private int versions;
     private boolean durable;
@@ -477,7 +481,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.table != null) {
             return this.table;
         }
-        return tuple.getStringByField(this.tableField).getBytes();
+        return (byte[]) tuple.getValueByField(this.tableField);
     }
 
     /**
@@ -488,7 +492,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.rowKeySerializer != null) {
             this.rowKey = this.columnQualifierSerializer.serialize(rowKey);
         } else {
-            this.rowKey = ((String) rowKey).getBytes();
+            this.rowKey = (byte[]) rowKey;
         }
 
         return this;
@@ -528,7 +532,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.rowKeySerializer != null) {
             return this.rowKeySerializer.serialize(tuple.getValueByField(this.rowKeyField));
         }
-        return tuple.getStringByField(this.rowKeyField).getBytes();
+        return (byte[]) tuple.getValueByField(this.rowKeyField);
     }
 
     /**
@@ -539,7 +543,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.columnFamilySerializer != null) {
             this.columnFamily = this.columnFamilySerializer.serialize(columnFamily);
         } else {
-            this.columnFamily = ((String) columnFamily).getBytes();
+            this.columnFamily = (byte[]) columnFamily;
         }
         return this;
     }
@@ -578,7 +582,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.columnFamilySerializer != null) {
             return this.columnFamilySerializer.serialize(tuple.getValueByField(this.columnFamilyField));
         }
-        return tuple.getStringByField(this.columnFamilyField).getBytes();
+        return (byte[]) tuple.getValueByField(this.columnFamilyField);
     }
 
     /**
@@ -589,7 +593,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.columnQualifierSerializer != null) {
             this.columnQualifier = this.columnQualifierSerializer.serialize(columnQualifier);
         } else {
-            this.columnQualifier = ((String) columnQualifier).getBytes();
+            this.columnQualifier = (byte[]) columnQualifier;
         }
         return this;
     }
@@ -629,7 +633,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.columnQualifierSerializer != null) {
             return this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierField));
         }
-        return tuple.getStringByField(this.columnQualifierField).getBytes();
+        return (byte[]) tuple.getValueByField(this.columnQualifierField);
     }
 
     /**
@@ -644,7 +648,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
             }
         } else {
             for (int i = 0; i < columnQualifiers.size(); i++) {
-                this.columnQualifiers[i] = ((String) columnQualifiers.get(i)).getBytes();
+                this.columnQualifiers[i] = (byte[]) columnQualifiers.get(i);
             }
         }
         return this;
@@ -684,7 +688,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                 }
             } else {
                 for (int i = 0; i < tupleValues.size(); i++) {
-                    qualifiers[i] = ((String)tupleValues.get(i)).getBytes();
+                    qualifiers[i] = (byte[]) tupleValues.get(i);
                 }
             }
             return qualifiers;
@@ -696,7 +700,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                 }
             } else {
                 for (int i = 0; i < this.columnQualifierFields.size(); i++) {
-                    qualifiers[i] = tuple.getStringByField(this.columnQualifierFields.get(i)).getBytes();
+                    qualifiers[i] = (byte[]) tuple.getValueByField(this.columnQualifierFields.get(i));
                 }
             }
             return qualifiers;
@@ -713,7 +717,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.valueSerializer != null) {
             this.value = this.valueSerializer.serialize(value);
         } else {
-            this.value = ((String) value).getBytes();
+            this.value = (byte[]) value;
         }
         return this;
     }
@@ -753,7 +757,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
         if (this.valueSerializer != null) {
             return this.valueSerializer.serialize(tuple.getValueByField(this.valueField));
         }
-        return tuple.getStringByField(this.valueField).getBytes();
+        return (byte[]) tuple.getValueByField(this.valueField);
     }
 
 
@@ -770,7 +774,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
             }
         } else {
             for (int i = 0; i < values.size(); i++) {
-                this.values[i] = ((String) values.get(i)).getBytes();
+                this.values[i] = (byte[]) values.get(i);
             }
         }
         return this;
@@ -813,7 +817,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                 }
             } else {
                 for (int i = 0; i < tupleValues.size(); i++) {
-                    values[i] = ((String)tupleValues.get(i)).getBytes();
+                    values[i] = (byte[]) tupleValues.get(i);
                 }
             }
             return values;
@@ -825,7 +829,7 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
                 }
             } else {
                 for (int i = 0; i < this.valueFields.size(); i++) {
-                    values[i] = tuple.getStringByField(this.valueFields.get(i)).getBytes();
+                    values[i] = (byte[]) tuple.getValueByField(this.valueFields.get(i));
                 }
             }
             return values;
@@ -846,12 +850,12 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
             if (this.columnQualifierSerializer != null) {
                 columnQualifiers[i] = this.columnQualifierSerializer.serialize(item.getKey());
             } else {
-                columnQualifiers[i] = ((String)item.getKey()).getBytes();
+                columnQualifiers[i] = (byte[]) item.getKey();
             }
             if (this.valueSerializer != null) {
                 values[i] = this.valueSerializer.serialize(item.getValue());
             } else {
-                values[i] = ((String)item.getValue()).getBytes();
+                values[i] = (byte[]) item.getValue();
             }
             i++;
         }
@@ -884,12 +888,12 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
             if (this.columnQualifierSerializer != null) {
                 qualifiersAndValues[0][i] = this.columnQualifierSerializer.serialize(item.getKey());
             } else {
-                qualifiersAndValues[0][i] = ((String)item.getKey()).getBytes();
+                qualifiersAndValues[0][i] = (byte[]) item.getKey();
             }
             if (this.valueSerializer != null) {
                 qualifiersAndValues[1][i] = this.valueSerializer.serialize(item.getValue());
             } else {
-                qualifiersAndValues[1][i] = ((String)item.getValue()).getBytes();
+                qualifiersAndValues[1][i] = (byte[]) item.getValue();
             }
             i++;
         }
@@ -916,12 +920,28 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     }
 
     /**
+     * @param serializer An AsyncHBaseIncrementSerializer to use to transform the
+     *                   timestamp to a long.<br/>
+     *                   Note that if you used a constant value ( setValue )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.<br/>
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setIncrementSerializer(AsyncHBaseIncrementSerializer serializer) {
+        this.incrementSerializer = serializer;
+        return this;
+    }
+
+    /**
      * @param tuple The storm tuple to process.
      * @return Increment to do.
      */
     public long getIncrement(Tuple tuple) {
         if (this.incrementField == null) {
             return this.increment;
+        }
+        if (this.incrementSerializer != null) {
+            return this.incrementSerializer.serialize(tuple.getValueByField(this.timestampField));
         }
         return tuple.getLongByField(this.incrementField);
     }
@@ -947,12 +967,28 @@ public class AsyncHBaseFieldMapper implements IAsyncHBaseFieldMapper {
     }
 
     /**
+     * @param serializer An AsyncHBaseIncrementSerializer to use to transform the
+     *                   timestamp to a long.<br/>
+     *                   Note that if you used a constant value ( setValue )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.<br/>
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseFieldMapper setTimestampSerializer(AsyncHBaseTimestampSerializer serializer) {
+        this.timestampSerializer = serializer;
+        return this;
+    }
+
+    /**
      * @param tuple The storm tuple to process.
      * @return The timestamp to use.
      */
     public long getTimestamp(Tuple tuple) {
         if (this.timestampField == null) {
             return this.timestamp;
+        }
+        if (this.timestampSerializer != null) {
+            return this.timestampSerializer.serialize(tuple.getValueByField(this.timestampField));
         }
         return tuple.getLongByField(this.timestampField);
     }

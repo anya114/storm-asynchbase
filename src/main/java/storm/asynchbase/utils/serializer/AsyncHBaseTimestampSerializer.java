@@ -4,20 +4,19 @@
 
 package storm.asynchbase.utils.serializer;
 
-import java.io.Serializable;
 import java.util.Map;
 
 /**
  * This interface represent a serializer
- * capable of returning a byte array from
+ * capable of returning a long timestamp from
  * a specific object to be stored to from HBase.
  */
-public interface AsyncHBaseSerializer extends Serializable {
+public interface AsyncHBaseTimestampSerializer {
     /**
      * @param object Object to serialize
-     * @return A byte array.
+     * @return A long timestamp.
      */
-    byte[] serialize(Object object);
+    long serialize(Object object);
 
     /**
      * <p>

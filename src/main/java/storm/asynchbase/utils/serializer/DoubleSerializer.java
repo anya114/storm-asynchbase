@@ -4,17 +4,20 @@
 
 package storm.asynchbase.utils.serializer;
 
+import org.hbase.async.Bytes;
+
+import java.io.Serializable;
 import java.util.Map;
 
-public class ByteArraySerializer implements AsyncHBaseSerializer, AsyncHBaseDeserializer {
+public class DoubleSerializer implements AsyncHBaseSerializer, AsyncHBaseDeserializer, Serializable {
     @Override
     public Object deserialize(byte[] value) {
-        return value;
+        return Double.longBitsToDouble(Bytes.getLong(value));
     }
 
     @Override
     public byte[] serialize(Object object) {
-        return (byte[]) object;
+        return Bytes.fromLong(Double.doubleToLongBits((Double) object));
     }
 
     @Override

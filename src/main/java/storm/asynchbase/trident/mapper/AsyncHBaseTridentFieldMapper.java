@@ -8,9 +8,12 @@ import org.hbase.async.AtomicIncrementRequest;
 import org.hbase.async.DeleteRequest;
 import org.hbase.async.GetRequest;
 import org.hbase.async.PutRequest;
+import storm.asynchbase.utils.serializer.AsyncHBaseIncrementSerializer;
 import storm.asynchbase.utils.serializer.AsyncHBaseSerializer;
+import storm.asynchbase.utils.serializer.AsyncHBaseTimestampSerializer;
 import storm.trident.tuple.TridentTuple;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -38,10 +41,13 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
     private String tableField;
     private String columnFamilyField;
     private String columnQualifierField;
+    private String columnQualifiersField;
     private List<String> columnQualifierFields;
     private String rowKeyField;
     private String valueField;
+    private String valuesField;
     private List<String> valueFields;
+    private String mapField;
     private String incrementField;
     private String timestampField;
 
@@ -49,6 +55,8 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
     private AsyncHBaseSerializer columnQualifierSerializer;
     private AsyncHBaseSerializer rowKeySerializer;
     private AsyncHBaseSerializer valueSerializer;
+    private AsyncHBaseIncrementSerializer incrementSerializer;
+    private AsyncHBaseTimestampSerializer timestampSerializer;
 
     private int versions;
     private boolean durable;
@@ -66,20 +74,20 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
      */
     public void updateMapping() {
         if (this.table == null && this.tableField == null) {
-            throw new InvalidMapperExcetion("Missing table");
+            throw new InvalidMapperException("Missing table");
         }
         if (this.rowKey == null && this.rowKeyField == null) {
-            throw new InvalidMapperExcetion("Missing rowkey");
+            throw new InvalidMapperException("Missing rowkey");
         }
 
         switch (this.type) {
             case PUT:
                 if (this.columnFamily == null && this.columnFamilyField == null) {
-                    throw new InvalidMapperExcetion("Missing column family");
+                    throw new InvalidMapperException("Missing column family");
                 }
                 if (this.value != null || this.valueField != null) {
                     if (this.columnQualifier == null && this.columnQualifierField == null) {
-                        throw new InvalidMapperExcetion("Missing column qualifier");
+                        throw new InvalidMapperException("Missing column qualifier");
                     }
                     if (this.timestamp > 0 || this.timestampField != null) {
                         this.constructor = Constructor.VALUE_WITH_TIMESTAMP;
@@ -88,9 +96,9 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                     }
                     break;
                 }
-                if (this.values != null || this.valueFields != null) {
+                if (this.values != null || this.valuesField != null || this.valueFields != null) {
                     if (this.columnQualifiers == null && this.columnQualifierFields == null) {
-                        throw new InvalidMapperExcetion("Missing column qualifiers");
+                        throw new InvalidMapperException("Missing column qualifiers");
                     }
                     if (this.timestamp > 0 || this.timestampField != null) {
                         this.constructor = Constructor.VALUES_WITH_TIMESTAMP;
@@ -99,23 +107,31 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                     }
                     break;
                 }
-                throw new InvalidMapperExcetion("Missing value");
+                if (this.mapField != null) {
+                    if (this.timestamp > 0 || this.timestampField != null) {
+                        this.constructor = Constructor.MAP_WITH_TIMESTAMP;
+                    } else {
+                        this.constructor = Constructor.MAP;
+                    }
+                    break;
+                }
+                throw new InvalidMapperException("Missing value");
             case INCR:
                 this.constructor = Constructor.VALUE;
                 if (this.increment <= 0 && this.incrementField == null) {
-                    throw new InvalidMapperExcetion("Missing increment amount");
+                    throw new InvalidMapperException("Missing increment amount");
                 }
                 if (this.columnQualifier == null && this.columnQualifierField == null) {
-                    throw new InvalidMapperExcetion("Missing column qualifier");
+                    throw new InvalidMapperException("Missing column qualifier");
                 }
                 if (this.columnFamily == null && this.columnFamilyField == null) {
-                    throw new InvalidMapperExcetion("Missing column family");
+                    throw new InvalidMapperException("Missing column family");
                 }
                 break;
             case DELETE:
                 if (this.columnQualifier != null || this.columnQualifierField != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
-                        throw new InvalidMapperExcetion("Missing column family");
+                        throw new InvalidMapperException("Missing column family");
                     }
                     if (this.timestamp > 0 || this.timestampField != null) {
                         this.constructor = Constructor.CELL_WITH_TIMESTAMP;
@@ -124,9 +140,9 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                     }
                     break;
                 }
-                if (this.columnQualifiers != null || this.columnQualifierFields != null) {
+                if (this.columnQualifiers != null || this.columnQualifiersField != null || this.columnQualifierFields != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
-                        throw new InvalidMapperExcetion("Missing column family");
+                        throw new InvalidMapperException("Missing column family");
                     }
                     if (this.timestamp > 0 || this.timestampField != null) {
                         this.constructor = Constructor.CELLS_WITH_TIMESTAMP;
@@ -152,14 +168,14 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
             case GET:
                 if (this.columnQualifier != null || this.columnQualifierField != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
-                        throw new InvalidMapperExcetion("Missing column family");
+                        throw new InvalidMapperException("Missing column family");
                     }
                     this.constructor = Constructor.CELL;
                     break;
                 }
-                if (this.columnQualifiers != null || this.columnQualifierFields != null) {
+                if (this.columnQualifiers != null || this.columnQualifiersField != null || this.columnQualifierFields != null) {
                     if (this.columnFamily == null && this.columnFamilyField == null) {
-                        throw new InvalidMapperExcetion("Missing column family");
+                        throw new InvalidMapperException("Missing column family");
                     }
                     this.constructor = Constructor.CELLS;
                     break;
@@ -171,7 +187,7 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                 this.constructor = Constructor.ROW;
                 break;
             default:
-                throw new InvalidMapperExcetion("Invalid request type");
+                throw new InvalidMapperException("Invalid request type");
         }
     }
 
@@ -221,11 +237,32 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                     this.getTimestamp(tuple)
                 );
                 break;
+            case MAP:
+                byte[][][] values = this.getQualifiersAndValues(tuple);
+                req = new PutRequest(
+                    this.getTable(tuple),
+                    this.getRowKey(tuple),
+                    this.getColumnFamily(tuple),
+                    values[0],
+                    values[1]
+                );
+                break;
+            case MAP_WITH_TIMESTAMP:
+                byte[][][] values2 = this.getQualifiersAndValues(tuple);
+                req = new PutRequest(
+                    this.getTable(tuple),
+                    this.getRowKey(tuple),
+                    this.getColumnFamily(tuple),
+                    values2[0],
+                    values2[1],
+                    this.getTimestamp(tuple)
+                );
+                break;
             default:
                 if (this.constructor == null) {
-                    throw new InvalidMapperExcetion("uninitialized mapper");
+                    throw new InvalidMapperException("uninitialized mapper");
                 }
-                throw new InvalidMapperExcetion("invalid field mapper for PutRequest");
+                throw new InvalidMapperException("invalid field mapper for PutRequest");
         }
 
         if (!this.bufferable) {
@@ -256,9 +293,9 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                 );
             default:
                 if (this.constructor == null) {
-                    throw new InvalidMapperExcetion("uninitialized mapper");
+                    throw new InvalidMapperException("uninitialized mapper");
                 }
-                throw new InvalidMapperExcetion("invalid field mapper for AtomicIncrementRequest");
+                throw new InvalidMapperException("invalid field mapper for AtomicIncrementRequest");
         }
     }
 
@@ -334,9 +371,9 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                 break;
             default:
                 if (this.constructor == null) {
-                    throw new InvalidMapperExcetion("uninitialized mapper");
+                    throw new InvalidMapperException("uninitialized mapper");
                 }
-                throw new InvalidMapperExcetion("invalid field mapper for DeleteRequest");
+                throw new InvalidMapperException("invalid field mapper for DeleteRequest");
         }
 
         if (req != null && !this.durable) {
@@ -389,9 +426,9 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
                 break;
             default:
                 if (this.constructor == null) {
-                    throw new InvalidMapperExcetion("uninitialized mapper");
+                    throw new InvalidMapperException("uninitialized mapper");
                 }
-                throw new InvalidMapperExcetion("invalid field mapper for GetRequest");
+                throw new InvalidMapperException("invalid field mapper for GetRequest");
         }
 
         if (this.versions > 0) {
@@ -444,157 +481,7 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         if (this.table != null) {
             return this.table;
         }
-        return tuple.getStringByField(this.tableField).getBytes();
-    }
-
-    /**
-     * @param columnFamily Column family to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnFamily(Object columnFamily) {
-        if (this.columnFamilySerializer != null) {
-            this.columnFamily = this.columnFamilySerializer.serialize(columnFamily);
-        } else {
-            this.columnFamily = ((String) columnFamily).getBytes();
-        }
-        return this;
-    }
-
-    /**
-     * @param columnFamilyField Name of the tuple field containing the
-     *                          column family to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnFamilyField(String columnFamilyField) {
-        this.columnFamilyField = columnFamilyField;
-        return this;
-    }
-
-    /**
-     * @param serializer An AsyncHBaseSerializer to use to transform column family to
-     *                   byte array.<br/>
-     *                   Note that if you use a constant value ( setColumnFamily )
-     *                   you have to provide the serializer before so that the serialization
-     *                   is done only once.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnFamilySerializer(AsyncHBaseSerializer serializer) {
-        this.columnFamilySerializer = serializer;
-        return this;
-    }
-
-    /**
-     * @param tuple The storm tuple to process.
-     * @return Column family as a byte array.
-     */
-    public byte[] getColumnFamily(TridentTuple tuple) {
-        if (this.columnFamilyField == null) {
-            return this.columnFamily;
-        }
-        if (this.columnFamilySerializer != null) {
-            return this.columnFamilySerializer.serialize(tuple.getValueByField(this.columnFamilyField));
-        }
-        return tuple.getStringByField(this.columnFamilyField).getBytes();
-    }
-
-    /**
-     * @param columnQualifier Column qualifier to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnQualifier(Object columnQualifier) {
-        if (this.columnQualifierSerializer != null) {
-            this.columnQualifier = this.columnQualifierSerializer.serialize(columnQualifier);
-        } else {
-            this.columnQualifier = ((String) columnQualifier).getBytes();
-        }
-        return this;
-    }
-
-    /**
-     * @param columnQualifierField Name of the tuple field containing the
-     *                             column qualifier to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnQualifierField(String columnQualifierField) {
-        this.columnQualifierField = columnQualifierField;
-        return this;
-    }
-
-    /**
-     * @param serializer An AsyncHBaseSerializer to use to transform column qualifier to
-     *                   byte array.<br/>
-     *                   Note that if you used a constant value ( setColumnQualifier )
-     *                   you have to provide the serializer before so that the serialization
-     *                   is done only once.<br/>
-     *                   Also apply if you use multiple column qualifiers.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnQualifierSerializer(AsyncHBaseSerializer serializer) {
-        this.columnQualifierSerializer = serializer;
-        return this;
-    }
-
-    /**
-     * @param tuple The storm tuple to process.
-     * @return Column qualifier as a byte array.
-     */
-    public byte[] getColumnQualifier(TridentTuple tuple) {
-        if (this.columnQualifierField == null) {
-            return this.columnQualifier;
-        }
-        if (this.columnQualifierSerializer != null) {
-            return this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierField));
-        }
-        return tuple.getStringByField(this.columnQualifierField).getBytes();
-    }
-
-    /**
-     * @param columnQualifiers List of column qualifiers to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnQualifiers(List<Object> columnQualifiers) {
-        this.columnQualifiers = new byte[columnQualifiers.size()][];
-        if (this.columnQualifierSerializer != null) {
-            for (int i = 0; i < columnQualifiers.size(); i++) {
-                this.columnQualifiers[i] = this.columnQualifierSerializer.serialize(columnQualifiers.get(i));
-            }
-        } else {
-            for (int i = 0; i < columnQualifiers.size(); i++) {
-                this.columnQualifiers[i] = ((String) columnQualifiers.get(i)).getBytes();
-            }
-        }
-        return this;
-    }
-
-    /**
-     * @param columnQualifierFields Name of the tuple fields containing the
-     *                              column qualifiers to use.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseTridentFieldMapper setColumnQualifierFields(List<String> columnQualifierFields) {
-        this.columnQualifierFields = columnQualifierFields;
-        return this;
-    }
-
-    /**
-     * @param tuple The storm tuple to process.
-     * @return Column qualifiers as an array of byte array.
-     */
-    public byte[][] getColumnQualifiers(TridentTuple tuple) {
-        if (this.columnQualifierFields == null) {
-            return this.columnQualifiers;
-        }
-        byte[][] qualifiers = new byte[this.columnQualifierFields.size()][];
-        if (this.columnQualifierSerializer != null) {
-            for (int i = 0; i < this.columnQualifierFields.size(); i++) {
-                qualifiers[i] = this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierFields.get(i)));
-            }
-        } else {
-            for (int i = 0; i < this.columnQualifierFields.size(); i++) {
-                qualifiers[i] = tuple.getStringByField(this.columnQualifierFields.get(i)).getBytes();
-            }
-        }
-        return qualifiers;
+        return (byte[]) tuple.getValueByField(this.tableField);
     }
 
     /**
@@ -605,7 +492,7 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         if (this.rowKeySerializer != null) {
             this.rowKey = this.columnQualifierSerializer.serialize(rowKey);
         } else {
-            this.rowKey = ((String) rowKey).getBytes();
+            this.rowKey = (byte[]) rowKey;
         }
 
         return this;
@@ -645,7 +532,181 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         if (this.rowKeySerializer != null) {
             return this.rowKeySerializer.serialize(tuple.getValueByField(this.rowKeyField));
         }
-        return tuple.getStringByField(this.rowKeyField).getBytes();
+        return (byte[]) tuple.getValueByField(this.rowKeyField);
+    }
+
+    /**
+     * @param columnFamily Column family to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnFamily(Object columnFamily) {
+        if (this.columnFamilySerializer != null) {
+            this.columnFamily = this.columnFamilySerializer.serialize(columnFamily);
+        } else {
+            this.columnFamily = (byte[]) columnFamily;
+        }
+        return this;
+    }
+
+    /**
+     * @param columnFamilyField Name of the tuple field containing the
+     *                          column family to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnFamilyField(String columnFamilyField) {
+        this.columnFamilyField = columnFamilyField;
+        return this;
+    }
+
+    /**
+     * @param serializer An AsyncHBaseSerializer to use to transform column family to
+     *                   byte array.<br/>
+     *                   Note that if you use a constant value ( setColumnFamily )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnFamilySerializer(AsyncHBaseSerializer serializer) {
+        this.columnFamilySerializer = serializer;
+        return this;
+    }
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return Column family as a byte array.
+     */
+    public byte[] getColumnFamily(TridentTuple tuple) {
+        if (this.columnFamilyField == null) {
+            return this.columnFamily;
+        }
+        if (this.columnFamilySerializer != null) {
+            return this.columnFamilySerializer.serialize(tuple.getValueByField(this.columnFamilyField));
+        }
+        return (byte[]) tuple.getValueByField(this.columnFamilyField);
+    }
+
+    /**
+     * @param columnQualifier Column qualifier to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifier(Object columnQualifier) {
+        if (this.columnQualifierSerializer != null) {
+            this.columnQualifier = this.columnQualifierSerializer.serialize(columnQualifier);
+        } else {
+            this.columnQualifier = (byte[]) columnQualifier;
+        }
+        return this;
+    }
+
+    /**
+     * @param columnQualifierField Name of the tuple field containing the
+     *                             column qualifier to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifierField(String columnQualifierField) {
+        this.columnQualifierField = columnQualifierField;
+        return this;
+    }
+
+    /**
+     * @param serializer An AsyncHBaseSerializer to use to transform column qualifier to
+     *                   byte array.<br/>
+     *                   Note that if you used a constant value ( setColumnQualifier )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.<br/>
+     *                   Also apply if you use multiple column qualifiers.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifierSerializer(AsyncHBaseSerializer serializer) {
+        this.columnQualifierSerializer = serializer;
+        return this;
+    }
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return Column qualifier as a byte array.
+     */
+    public byte[] getColumnQualifier(TridentTuple tuple) {
+        if (this.columnQualifierField == null) {
+            return this.columnQualifier;
+        }
+        if (this.columnQualifierSerializer != null) {
+            return this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierField));
+        }
+        return (byte[]) tuple.getValueByField(this.columnQualifierField);
+    }
+
+    /**
+     * @param columnQualifiers List of column qualifiers to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifiers(List<Object> columnQualifiers) {
+        this.columnQualifiers = new byte[columnQualifiers.size()][];
+        if (this.columnQualifierSerializer != null) {
+            for (int i = 0; i < columnQualifiers.size(); i++) {
+                this.columnQualifiers[i] = this.columnQualifierSerializer.serialize(columnQualifiers.get(i));
+            }
+        } else {
+            for (int i = 0; i < columnQualifiers.size(); i++) {
+                this.columnQualifiers[i] = (byte[]) columnQualifiers.get(i);
+            }
+        }
+        return this;
+    }
+
+    /**
+     * @param columnQualifierFields Name of the tuple fields containing the
+     *                              column qualifiers to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifierFields(List<String> columnQualifierFields) {
+        this.columnQualifierFields = columnQualifierFields;
+        return this;
+    }
+
+    /**
+     * @param columnQualifiersField Name of the tuple fields containing a
+     *                              list of column qualifiers to use.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setColumnQualifiersField(String columnQualifiersField) {
+        this.columnQualifiersField = columnQualifiersField;
+        return this;
+    }
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return Column qualifiers as an array of byte array.
+     */
+    public byte[][] getColumnQualifiers(TridentTuple tuple) {
+        if (this.columnQualifiersField != null) {
+            ArrayList<Object> tupleValues = (ArrayList<Object>) tuple.getValueByField(this.columnQualifiersField);
+            byte[][] qualifiers = new byte[tupleValues.size()][];
+            if (this.columnQualifierSerializer != null) {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    qualifiers[i] = this.valueSerializer.serialize(tupleValues.get(i));
+                }
+            } else {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    qualifiers[i] = (byte[]) tupleValues.get(i);
+                }
+            }
+            return qualifiers;
+        } else if (this.columnQualifierFields != null) {
+            byte[][] qualifiers = new byte[this.columnQualifierFields.size()][];
+            if (this.columnQualifierSerializer != null) {
+                for (int i = 0; i < this.columnQualifierFields.size(); i++) {
+                    qualifiers[i] = this.columnQualifierSerializer.serialize(tuple.getValueByField(this.columnQualifierFields.get(i)));
+                }
+            } else {
+                for (int i = 0; i < this.columnQualifierFields.size(); i++) {
+                    qualifiers[i] = (byte[]) tuple.getValueByField(this.columnQualifierFields.get(i));
+                }
+            }
+            return qualifiers;
+        } else {
+            return this.columnQualifiers;
+        }
     }
 
     /**
@@ -656,7 +717,7 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         if (this.valueSerializer != null) {
             this.value = this.valueSerializer.serialize(value);
         } else {
-            this.value = ((String) value).getBytes();
+            this.value = (byte[]) value;
         }
         return this;
     }
@@ -696,12 +757,12 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         if (this.valueSerializer != null) {
             return this.valueSerializer.serialize(tuple.getValueByField(this.valueField));
         }
-        return tuple.getStringByField(this.valueField).getBytes();
+        return (byte[]) tuple.getValueByField(this.valueField);
     }
+
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
      * @param values List of cell values to use.
      * @return This so you can do method chaining.
      */
@@ -713,7 +774,7 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
             }
         } else {
             for (int i = 0; i < values.size(); i++) {
-                this.values[i] = ((String) values.get(i)).getBytes();
+                this.values[i] = (byte[]) values.get(i);
             }
         }
         return this;
@@ -721,7 +782,17 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
+     * @param valuesField Name of the tuple field containing a
+     *                    list of values.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setValuesField(String valuesField) {
+        this.valuesField = valuesField;
+        return this;
+    }
+
+    /**
+     * Note : Values are mapped to qualifiers in order.
      * @param valueFields Name of the tuple fields containing the
      *                    cell values to use.
      * @return This so you can do method chaining.
@@ -733,25 +804,100 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
 
     /**
      * Note : Values are mapped to qualifiers in order.
-     *
      * @param tuple The storm tuple to process.
      * @return Cell values as an array of byte array.
      */
     public byte[][] getValues(TridentTuple tuple) {
-        if (this.valueFields == null) {
+        if (this.valuesField != null) {
+            ArrayList<Object> tupleValues = (ArrayList<Object>) tuple.getValueByField(this.valuesField);
+            byte[][] values = new byte[tupleValues.size()][];
+            if (this.valueSerializer != null) {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    values[i] = this.valueSerializer.serialize(tupleValues.get(i));
+                }
+            } else {
+                for (int i = 0; i < tupleValues.size(); i++) {
+                    values[i] = (byte[]) tupleValues.get(i);
+                }
+            }
+            return values;
+        } else if (this.valueFields != null) {
+            byte[][] values = new byte[this.valueFields.size()][];
+            if (this.valueSerializer != null) {
+                for (int i = 0; i < this.valueFields.size(); i++) {
+                    values[i] = this.valueSerializer.serialize(tuple.getValueByField(this.valueFields.get(i)));
+                }
+            } else {
+                for (int i = 0; i < this.valueFields.size(); i++) {
+                    values[i] = (byte[]) tuple.getValueByField(this.valueFields.get(i));
+                }
+            }
+            return values;
+        } else {
             return this.values;
         }
-        byte[][] values = new byte[this.valueFields.size()][];
-        if (this.valueSerializer != null) {
-            for (int i = 0; i < this.valueFields.size(); i++) {
-                values[i] = this.valueSerializer.serialize(tuple.getValueByField(this.valueFields.get(i)));
+    }
+
+    /**
+     * @param map ColumnQualifiers / values map.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setMap(Map<Object, Object> map) {
+        this.columnQualifiers = new byte[map.size()][];
+        this.values = new byte[map.size()][];
+        int i = 0;
+        for (Map.Entry<Object, Object> item : map.entrySet()) {
+            if (this.columnQualifierSerializer != null) {
+                columnQualifiers[i] = this.columnQualifierSerializer.serialize(item.getKey());
+            } else {
+                columnQualifiers[i] = (byte[]) item.getKey();
             }
-        } else {
-            for (int i = 0; i < this.valueFields.size(); i++) {
-                values[i] = tuple.getStringByField(this.valueFields.get(i)).getBytes();
+            if (this.valueSerializer != null) {
+                values[i] = this.valueSerializer.serialize(item.getValue());
+            } else {
+                values[i] = (byte[]) item.getValue();
             }
+            i++;
         }
-        return values;
+        return this;
+    }
+
+    /**
+     * @param mapField Name of the tuple field containing a
+     *                 columnQualifier / value Map.
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setMapField(String mapField) {
+        this.mapField = mapField;
+        return this;
+    }
+
+
+    /**
+     * @param tuple The storm tuple to process.
+     * @return index 0 - Array of byte array of qualifiers
+     * index 1 - Array of byte array of values
+     */
+    public byte[][][] getQualifiersAndValues(TridentTuple tuple) {
+        byte[][][] qualifiersAndValues = new byte[2][][];
+        Map<Object, Object> map = (Map<Object, Object>) tuple.getValueByField(this.mapField);
+        qualifiersAndValues[0] = new byte[map.size()][];
+        qualifiersAndValues[1] = new byte[map.size()][];
+        int i = 0;
+        for (Map.Entry<Object, Object> item : map.entrySet()) {
+            if (this.columnQualifierSerializer != null) {
+                qualifiersAndValues[0][i] = this.columnQualifierSerializer.serialize(item.getKey());
+            } else {
+                qualifiersAndValues[0][i] = (byte[]) item.getKey();
+            }
+            if (this.valueSerializer != null) {
+                qualifiersAndValues[1][i] = this.valueSerializer.serialize(item.getValue());
+            } else {
+                qualifiersAndValues[1][i] = (byte[]) item.getValue();
+            }
+            i++;
+        }
+        return qualifiersAndValues;
     }
 
     /**
@@ -774,12 +920,28 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
     }
 
     /**
+     * @param serializer An AsyncHBaseIncrementSerializer to use to transform the
+     *                   timestamp to a long.<br/>
+     *                   Note that if you used a constant value ( setValue )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.<br/>
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setIncrementSerializer(AsyncHBaseIncrementSerializer serializer) {
+        this.incrementSerializer = serializer;
+        return this;
+    }
+
+    /**
      * @param tuple The storm tuple to process.
      * @return Increment to do.
      */
     public long getIncrement(TridentTuple tuple) {
         if (this.incrementField == null) {
             return this.increment;
+        }
+        if (this.incrementSerializer != null) {
+            return this.incrementSerializer.serialize(tuple.getValueByField(this.timestampField));
         }
         return tuple.getLongByField(this.incrementField);
     }
@@ -805,12 +967,28 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
     }
 
     /**
+     * @param serializer An AsyncHBaseIncrementSerializer to use to transform the
+     *                   timestamp to a long.<br/>
+     *                   Note that if you used a constant value ( setValue )
+     *                   you have to provide the serializer before so that the serialization
+     *                   is done only once.<br/>
+     * @return This so you can do method chaining.
+     */
+    public AsyncHBaseTridentFieldMapper setTimestampSerializer(AsyncHBaseTimestampSerializer serializer) {
+        this.timestampSerializer = serializer;
+        return this;
+    }
+
+    /**
      * @param tuple The storm tuple to process.
      * @return The timestamp to use.
      */
     public long getTimestamp(TridentTuple tuple) {
         if (this.timestampField == null) {
             return this.timestamp;
+        }
+        if (this.timestampSerializer != null) {
+            return this.timestampSerializer.serialize(tuple.getValueByField(this.timestampField));
         }
         return tuple.getLongByField(this.timestampField);
     }
@@ -902,8 +1080,12 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
         VALUE_WITH_TIMESTAMP,
         VALUES,
         VALUES_WITH_TIMESTAMP,
+        MAP,
+        MAP_WITH_TIMESTAMP,
         CELL,
         CELL_WITH_TIMESTAMP,
+        DYNAMIC_CELL,
+        DYNAMIC_CELL_WITH_TIMESTAMP,
         CELLS,
         CELLS_WITH_TIMESTAMP,
         FAMILY,
@@ -919,8 +1101,8 @@ public class AsyncHBaseTridentFieldMapper implements IAsyncHBaseTridentFieldMapp
      * constructor to use to execute the request.
      * </p>
      */
-    class InvalidMapperExcetion extends RuntimeException {
-        public InvalidMapperExcetion(String message) {
+    class InvalidMapperException extends RuntimeException {
+        public InvalidMapperException(String message) {
             super(type + " request : " + message);
         }
     }
