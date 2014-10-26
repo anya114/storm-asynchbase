@@ -73,12 +73,14 @@ public class AsyncHBaseBolt implements IRichBolt {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseBolt.class);
     private final String cluster;
     private final IAsyncHBaseMapper mapper;
-    private Errback errback;
     private HBaseClient client;
     private OutputCollector collector;
     private boolean async = true;
     private long timeout = 0;
     private volatile boolean throttle = false;
+
+    private Callback<Object, Long> incrCastCallback;
+    private Callback<Object, ArrayList<KeyValue>> getCastCallback;
 
     /**
      * @param cluster Cluster name to get the right AsyncHBase client.
@@ -113,7 +115,18 @@ public class AsyncHBaseBolt implements IRichBolt {
         this.collector = collector;
         this.client = AsyncHBaseClientFactory.getHBaseClient(conf, this.cluster);
         this.mapper.prepare(conf);
-        errback = new Errback();
+        this.incrCastCallback = new Callback<Object, Long>() {
+            @Override
+            public Object call(Long value) throws Exception {
+                return value;
+            }
+        };
+        this.getCastCallback = new Callback<Object, ArrayList<KeyValue>>() {
+            @Override
+            public Object call(ArrayList<KeyValue> values) throws Exception {
+                return values;
+            }
+        };
     }
 
     @Override
@@ -124,37 +137,25 @@ public class AsyncHBaseBolt implements IRichBolt {
             switch (fieldMapper.getRpcType()) {
                 case PUT:
                     requests.add(
-                        client.put(fieldMapper.getPutRequest(tuple))
-                            .addErrback(errback));
+                            client.put(fieldMapper.getPutRequest(tuple)));
                     break;
                 case INCR:
                     requests.add(
-                        client.atomicIncrement(fieldMapper.getIncrementRequest(tuple))
-                            .addErrback(errback)
-                                // Dummy callback to cast long to Object
-                            .addCallback(new Callback<Object, Long>() {
-                                @Override
-                                public Object call(Long value) throws Exception {
-                                    return value;
-                                }
-                            }));
+                            client.atomicIncrement(fieldMapper.getIncrementRequest(tuple))
+                                    // Dummy callback to cast long to Object
+                                    .addCallback(incrCastCallback)
+                    );
                     break;
                 case DELETE:
                     requests.add(
-                        client.delete(fieldMapper.getDeleteRequest(tuple))
-                            .addErrback(errback));
+                            client.delete(fieldMapper.getDeleteRequest(tuple)));
                     break;
                 case GET:
                     requests.add(
-                        client.get(fieldMapper.getGetRequest(tuple))
-                            .addErrback(errback)
-                                // Dummy callback to cast ArrayList<KeyValue> to Object
-                            .addCallback(new Callback<Object, ArrayList<KeyValue>>() {
-                                @Override
-                                public Object call(ArrayList<KeyValue> values) throws Exception {
-                                    return values;
-                                }
-                            }).addErrback(errback));
+                            client.get(fieldMapper.getGetRequest(tuple))
+                                    // Dummy callback to cast ArrayList<KeyValue> to Object
+                                    .addCallback(getCastCallback)
+                    );
                     break;
             }
         }
@@ -193,26 +194,7 @@ public class AsyncHBaseBolt implements IRichBolt {
             }
             this.collector.ack(tuple);
         } else {
-            results.addCallbacks(new Callback<Object, ArrayList<Object>>() {
-                @Override
-                public Object call(ArrayList<Object> results) throws Exception {
-                    synchronized (collector) {
-                        collector.emit(results);
-                        collector.ack(tuple);
-                    }
-                    return null;
-                }
-            }, new Callback<Object, Exception>() {
-                @Override
-                public Object call(Exception ex) throws Exception {
-                    // ERROR
-                    log.error("AsyncHBase exception : " + ex.toString());
-                    synchronized (collector) {
-                        collector.fail(tuple);
-                    }
-                    return this;
-                }
-            });
+            results.addCallbacks(new SuccessCallback(tuple), new ErrorCallback(tuple));
         }
     }
 
@@ -232,18 +214,44 @@ public class AsyncHBaseBolt implements IRichBolt {
     }
 
     /**
-     * <p>
-     * This error callback checks if there is a need to throttle
-     * </p>
+     * Called on success in async mode to asynchronously ack the tuple.
      */
-    final class Errback implements Callback<Object, Exception> {
+    class SuccessCallback implements Callback<Object, ArrayList<Object>> {
+        final Tuple tuple;
+
+        SuccessCallback(Tuple tuple) {
+            this.tuple = tuple;
+        }
+
         @Override
-        public Object call(final Exception ex) {
+        public Object call(ArrayList<Object> results) throws Exception {
+            synchronized (collector) {
+                collector.ack(tuple);
+            }
+            return null;
+        }
+    }
+
+    /**
+     * Called on failure in async mode to asynchronously fail the tuple.
+     */
+    class ErrorCallback implements Callback<Object, Exception> {
+        final Tuple tuple;
+
+        ErrorCallback(Tuple tuple) {
+            this.tuple = tuple;
+        }
+
+        @Override
+        public Object call(Exception ex) throws Exception {
+            log.error("AsyncHBase exception : " + ex.toString());
             if (ex instanceof PleaseThrottleException) {
                 throttle = true;
-                return null;
+                return ex;
             }
-
+            synchronized (collector) {
+                collector.fail(tuple);
+            }
             return ex;
         }
     }
