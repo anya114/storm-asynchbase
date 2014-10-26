@@ -11,6 +11,7 @@ import org.hbase.async.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import storm.asynchbase.trident.mapper.IAsyncHBaseTridentFieldMapper;
+import storm.asynchbase.trident.mapper.IAsyncHBaseTridentMapper;
 import storm.asynchbase.utils.AsyncHBaseClientFactory;
 import storm.trident.operation.TridentCollector;
 import storm.trident.state.State;
@@ -20,6 +21,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * <p>
@@ -39,47 +41,46 @@ import java.util.Map;
 public class AsyncHBaseState implements State {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseState.class);
     private final HBaseClient client;
-    private final Options options;
 
     /**
-     * @param options AsyncHBaseState options.
-     * @param conf    Topology configuration.
+     * @param client AsyncHBaseClient to use.
      */
-    public AsyncHBaseState(Options options, Map conf) {
-        this.options = options;
-        this.client = AsyncHBaseClientFactory.getHBaseClient(conf, options.cluster);
+    public AsyncHBaseState(HBaseClient client) {
+        this.client = client;
     }
 
     /**
-     * @param tuples    Storm tuples to process.
-     * @param collector Unused as PutRequest returns void.
+     * @param tuples        Storm tuples to process.
+     * @param updateMapper  A mapper to map trident tuple to AsyncHBase requests.
+     * @return Future results.
      */
-    public void updateState(final List<TridentTuple> tuples, final TridentCollector collector) {
+    public Deferred<ArrayList<Object>> updateState(final IAsyncHBaseTridentMapper updateMapper, final List<TridentTuple> tuples) {
         ArrayList<Deferred<Object>> results = new ArrayList<>(tuples.size());
 
         for (TridentTuple tuple : tuples) {
-            results.add(this.client.put(this.options.updateMapper.getPutRequest(tuple)));
+            for ( IAsyncHBaseTridentFieldMapper fieldMapper : updateMapper.getFieldMappers() ) {
+                results.add(this.client.put(fieldMapper.getPutRequest(tuple)));
+            }
         }
 
-        try {
-            Deferred.group(results).joinUninterruptibly(this.options.timeout);
-        } catch (Exception ex) {
-            this.handleFailure(ex);
-        }
+        return Deferred.groupInOrder(results);
     }
 
     /**
-     * @param tuples Storm Storm tuples to process.
-     * @return Future results.
+     * @param tuples        Storm tuples to process.
+     * @param queryMapper   A mapper to map trident tuple to AsyncHBase requests.
+     * @return List of Future results.
      */
-    public List<Deferred<ArrayList<KeyValue>>> get(final List<TridentTuple> tuples) {
-        ArrayList<Deferred<ArrayList<KeyValue>>> results = new ArrayList<>(tuples.size());
+    public List<Deferred<ArrayList<KeyValue>>> get(final IAsyncHBaseTridentMapper queryMapper, final List<TridentTuple> tuples) {
+        List<Deferred<ArrayList<KeyValue>>> requests = new ArrayList<>(tuples.size());
 
         for (TridentTuple tuple : tuples) {
-            results.add(this.client.get(this.options.queryMapper.getGetRequest(tuple)));
+            for ( IAsyncHBaseTridentFieldMapper fieldMapper : queryMapper.getFieldMappers() ) {
+                requests.add(this.client.get(fieldMapper.getGetRequest(tuple)));
+            }
         }
 
-        return results;
+        return requests;
     }
 
     @Override
@@ -90,50 +91,5 @@ public class AsyncHBaseState implements State {
     @Override
     public void commit(Long txid) {
         log.debug("Commit tx " + txid);
-    }
-
-    private void handleFailure(Exception ex) {
-        switch (this.options.failStrategy) {
-            case LOG:
-                log.error("AsyncHBase error while executing HBase RPC" + ex.getMessage());
-                break;
-            case RETRY:
-                throw new FailedException("AsyncHBase error while executing HBase RPC " + ex.getMessage());
-            case FAILFAST:
-                throw new RuntimeException("AsyncHBase error while executing HBase RPC " + ex.getMessage());
-        }
-    }
-
-    /**
-     * <ul>
-     * <li>
-     * cluster : AsyncHBase client to use.
-     * </li>
-     * <li>
-     * timeout : timeout while doing multiget/multiput in milliseconds
-     * </li>
-     * <li>
-     * table : table to use<br/>
-     * columnFamily : columnFamily to use<br/>
-     * columnQualifier : columnQualifier to use<br/>
-     * </li>
-     * <li>
-     * FailStrategy : Modify the way strom will handle AsyncHBase failures.<br/>
-     * LOG : Only log error and don't return any results.<br/>
-     * RETRY : Ask the spout to replay the batch.<br/>
-     * FAILFAST : Let the function crash.<br/>
-     * null/NOOP : Do nothing.<br/>
-     * http://svendvanderveken.wordpress.com/2014/02/05/error-handling-in-storm-trident-topologies/
-     * </li>
-     * </ul>
-     */
-    public static class Options implements Serializable {
-        public String cluster;
-        public long timeout = 0;
-        public IAsyncHBaseTridentFieldMapper updateMapper;
-        public IAsyncHBaseTridentFieldMapper queryMapper;
-        public FailStrategy failStrategy = FailStrategy.LOG;
-
-        public enum FailStrategy {NOOP, LOG, FAILFAST, RETRY}
     }
 }

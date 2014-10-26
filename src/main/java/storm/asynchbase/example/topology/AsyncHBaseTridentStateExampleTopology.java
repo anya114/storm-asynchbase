@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import storm.asynchbase.example.spout.RandomKeyValueBatchSpout;
 import storm.asynchbase.example.trident.operation.StreamRateAggregator;
 import storm.asynchbase.trident.mapper.AsyncHBaseTridentFieldMapper;
+import storm.asynchbase.trident.mapper.AsyncHBaseTridentMapper;
 import storm.asynchbase.trident.mapper.IAsyncHBaseTridentFieldMapper;
+import storm.asynchbase.trident.mapper.IAsyncHBaseTridentMapper;
 import storm.asynchbase.trident.state.AsyncHBaseState;
 import storm.asynchbase.trident.state.AsyncHBaseStateFactory;
 import storm.asynchbase.trident.state.AsyncHBaseStateQuery;
@@ -65,36 +67,37 @@ public class AsyncHBaseTridentStateExampleTopology {
         TridentTopology topology = new TridentTopology();
         Stream stream = topology.newStream("stream", new RandomKeyValueBatchSpout(10).setSleep(100)).parallelismHint(5);
 
-        AsyncHBaseState.Options streamRateOptions = new AsyncHBaseState.Options();
-        streamRateOptions.cluster = "hbase-cluster";
+        IAsyncHBaseTridentMapper updateMapper = new AsyncHBaseTridentMapper()
+            .addFieldMapper( new AsyncHBaseTridentFieldMapper()
+                .setTable("test")
+                .setColumnFamily("data")
+                .setColumnQualifier("stream rate")
+                .setRowKey("global rate")
+                .setValueField("rate")
+                .setValueSerializer(new AsyncHBaseLongSerializer())
+            );
 
-        streamRateOptions.updateMapper = new AsyncHBaseTridentFieldMapper()
-            .setTable("test")
-            .setColumnFamily("data")
-            .setColumnQualifier("stream rate")
-            .setRowKey("global rate")
-            .setValueField("rate")
-            .setValueSerializer(new AsyncHBaseLongSerializer());
-
-        streamRateOptions.queryMapper = new AsyncHBaseTridentFieldMapper()
-            .setRpcType(IAsyncHBaseTridentFieldMapper.Type.GET)
-            .setTable("test")
-            .setColumnFamily("data")
-            .setColumnQualifier("stream rate")
-            .setRowKey("global rate");
+        IAsyncHBaseTridentMapper queryMapper = new AsyncHBaseTridentMapper()
+            .addFieldMapper( new AsyncHBaseTridentFieldMapper()
+                .setRpcType(IAsyncHBaseTridentFieldMapper.Type.GET)
+                .setTable("test")
+                .setColumnFamily("data")
+                .setColumnQualifier("stream rate")
+                .setRowKey("global rate")
+            );
 
         TridentState streamRate = stream
             .aggregate(new Fields(), new StreamRateAggregator(2), new Fields("rate"))
             .partitionPersist(
-                new AsyncHBaseStateFactory(streamRateOptions),
+                new AsyncHBaseStateFactory("hbase-cluster"),
                 new Fields("rate"),
-                new AsyncHBaseStateUpdater()
+                new AsyncHBaseStateUpdater(updateMapper)
             ).parallelismHint(5);
 
         topology.newDRPCStream("stream rate drpc", drpc)
             .stateQuery(
                 streamRate,
-                new AsyncHBaseStateQuery()
+                new AsyncHBaseStateQuery(queryMapper)
                     .setValueDeserializer(new AsyncHBaseLongSerializer()),
                 new Fields("rate"))
             .each(new Fields("rate"), new Debug());

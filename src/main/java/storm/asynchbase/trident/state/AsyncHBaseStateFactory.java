@@ -5,6 +5,9 @@
 package storm.asynchbase.trident.state;
 
 import backtype.storm.task.IMetricsContext;
+import storm.asynchbase.bolt.mapper.IAsyncHBaseMapper;
+import storm.asynchbase.trident.mapper.IAsyncHBaseTridentMapper;
+import storm.asynchbase.utils.AsyncHBaseClientFactory;
 import storm.trident.state.State;
 import storm.trident.state.StateFactory;
 
@@ -14,13 +17,13 @@ import java.util.Map;
  * Factory to handle creation of AsyncHBaseState objects
  */
 public class AsyncHBaseStateFactory implements StateFactory {
-    private final AsyncHBaseState.Options options;
+    private final String cluster;
 
     /**
-     * @param options State configuration
+     * @param cluster         HBase cluster to use
      */
-    public AsyncHBaseStateFactory(AsyncHBaseState.Options options) {
-        this.options = options;
+    public AsyncHBaseStateFactory(String cluster) {
+        this.cluster = cluster;
     }
 
     /**
@@ -36,12 +39,6 @@ public class AsyncHBaseStateFactory implements StateFactory {
      */
     @Override
     public State makeState(Map conf, IMetricsContext metrics, int partitionIndex, int numPartitions) {
-        if (this.options.queryMapper != null) {
-            this.options.queryMapper.prepare(conf);
-        }
-        if (this.options.updateMapper != null) {
-            this.options.updateMapper.prepare(conf);
-        }
-        return new AsyncHBaseState(this.options, conf);
+        return new AsyncHBaseState(AsyncHBaseClientFactory.getHBaseClient(conf, cluster));
     }
 }

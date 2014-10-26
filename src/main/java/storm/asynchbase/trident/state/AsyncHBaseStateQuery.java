@@ -10,6 +10,7 @@ import com.stumbleupon.async.Deferred;
 import org.hbase.async.KeyValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import storm.asynchbase.trident.mapper.IAsyncHBaseTridentMapper;
 import storm.asynchbase.utils.serializer.AsyncHBaseDeserializer;
 import storm.trident.operation.TridentCollector;
 import storm.trident.operation.TridentOperationContext;
@@ -37,9 +38,14 @@ import java.util.Map;
  */
 public class AsyncHBaseStateQuery extends BaseQueryFunction<AsyncHBaseState, Deferred<ArrayList<KeyValue>>> {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseStateQuery.class);
-    public FailStrategy failStrategy = FailStrategy.LOG;
     private AsyncHBaseDeserializer valueDeserializer;
     private long timeout = 0;
+
+    private final IAsyncHBaseTridentMapper mapper;
+
+    public AsyncHBaseStateQuery(IAsyncHBaseTridentMapper mapper) {
+        this.mapper = mapper;
+    }
 
     /**
      * @param deserializer Deserializer to use to map cell value to a specific type.
@@ -62,24 +68,6 @@ public class AsyncHBaseStateQuery extends BaseQueryFunction<AsyncHBaseState, Def
 
     /**
      * <p>
-     * LOG : Only log error and don't return any results.<br/>
-     * RETRY : Ask the spout to replay the batch.<br/>
-     * FAILFAST : Let the function crash.<br/>
-     * null/NOOP : Do nothing.
-     * </p>
-     * <p>
-     * http://svendvanderveken.wordpress.com/2014/02/05/error-handling-in-storm-trident-topologies/
-     * </p>
-     * @param strategy Set the strategy to adopt in case of AsyncHBase exception.
-     * @return This so you can do method chaining.
-     */
-    public AsyncHBaseStateQuery setFailStrategy(FailStrategy strategy) {
-        this.failStrategy = strategy;
-        return this;
-    }
-
-    /**
-     * <p>
      * Get corresponding HBaseClient and Initialize serializer if any.
      * </p>
      *
@@ -94,43 +82,25 @@ public class AsyncHBaseStateQuery extends BaseQueryFunction<AsyncHBaseState, Def
         }
     }
 
-    /**
-     * @param state  AsyncHBaseState to query.
-     * @param tuples Storm tuples to process.
-     * @return List of Future results.
-     */
     @Override
     public List<Deferred<ArrayList<KeyValue>>> batchRetrieve(AsyncHBaseState state, List<TridentTuple> tuples) {
-        return state.get(tuples);
+        return state.get(mapper,tuples);
     }
 
     @Override
-    public void execute(TridentTuple tuple, Deferred<ArrayList<KeyValue>> result, final TridentCollector collector) {
+    public void execute(TridentTuple tuple, Deferred<ArrayList<KeyValue>> requests, final TridentCollector collector) {
         try {
-            ArrayList<KeyValue> results = result.joinUninterruptibly(this.timeout);
-            if (results.size() > 0) {
+            List<KeyValue> cells = requests.joinUninterruptibly(this.timeout);
+            for ( KeyValue cell : cells ) {
                 if (valueDeserializer != null) {
-                    collector.emit(new Values(valueDeserializer.deserialize(results.get(0).value())));
+                    collector.emit(new Values(valueDeserializer.deserialize(cell.value())));
                 } else {
-                    collector.emit(new Values(results.get(0).value()));
+                    collector.emit(new Values(cell.value()));
                 }
             }
         } catch (Exception ex) {
-            this.handleFailure(ex);
+            log.warn("AsyncHBase failure ", ex);
+            collector.reportError(ex);
         }
     }
-
-    private void handleFailure(Exception ex) {
-        switch (this.failStrategy) {
-            case LOG:
-                log.error("AsyncHBase error while executing HBase RPC" + ex.getMessage());
-                break;
-            case RETRY:
-                throw new FailedException("AsyncHBase error while executing HBase RPC " + ex.getMessage());
-            case FAILFAST:
-                throw new RuntimeException("AsyncHBase error while executing HBase RPC " + ex.getMessage());
-        }
-    }
-
-    public enum FailStrategy {NOOP, LOG, FAILFAST, RETRY}
 }
