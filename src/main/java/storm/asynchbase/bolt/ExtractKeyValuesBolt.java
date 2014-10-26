@@ -25,9 +25,7 @@ import java.util.Map;
  * This bolt extract fields from List<KeyValue> returned by AsyncHBase GetRequests.<br/>
  * Output tuple fields order is RowKey,ColumnFamily,ColumnQualifier,Value,Timestamp.<br/>
  * You can select which fields you want to be returned in the constructor.
- * You may provide deserializers to map byte[] to the type you want. By default it tries to
- * map result to String. So you need to provide a serializer if you want to keep byte[],
- * shame but string is still the most used type and it's not hard to override this behaviour.
+ * You may provide deserializers to map byte[] to the type you want.
  * </p>
  */
 public class ExtractKeyValuesBolt extends BaseRichBolt {
@@ -117,28 +115,28 @@ public class ExtractKeyValuesBolt extends BaseRichBolt {
                     if (this.rowKeyDeserializer != null) {
                         values.add(this.rowKeyDeserializer.deserialize(keyValue.key()));
                     } else {
-                        values.add(new String(keyValue.key()));
+                        values.add(keyValue.key());
                     }
                 }
                 if (this.family) {
                     if (this.columnFamilyDeserializer != null) {
                         values.add(this.columnFamilyDeserializer.deserialize(keyValue.family()));
                     } else {
-                        values.add(new String(keyValue.family()));
+                        values.add(keyValue.family());
                     }
                 }
                 if (this.qualifier) {
                     if (this.columnQualifierDeserializer != null) {
                         values.add(this.columnFamilyDeserializer.deserialize(keyValue.qualifier()));
                     } else {
-                        values.add(new String(keyValue.qualifier()));
+                        values.add(keyValue.qualifier());
                     }
                 }
                 if (this.value) {
                     if (this.valueDeserializer != null) {
                         values.add(this.valueDeserializer.deserialize(keyValue.value()));
                     } else {
-                        values.add(new String(keyValue.value()));
+                        values.add(keyValue.value());
                     }
                 }
                 if (this.timestamp) {
