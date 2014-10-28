@@ -25,7 +25,7 @@ public class AsyncHBaseStateUpdater extends BaseStateUpdater<AsyncHBaseState> {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseStateUpdater.class);
 
     private final IAsyncHBaseTridentMapper mapper;
-    private boolean throttle = true;
+    private boolean throttle = false;
     private boolean async = true;
 
     public AsyncHBaseStateUpdater(IAsyncHBaseTridentMapper mapper) {
