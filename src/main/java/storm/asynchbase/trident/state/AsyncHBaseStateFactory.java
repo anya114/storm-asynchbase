@@ -39,6 +39,7 @@ public class AsyncHBaseStateFactory implements StateFactory {
      */
     @Override
     public State makeState(Map conf, IMetricsContext metrics, int partitionIndex, int numPartitions) {
+
         return new AsyncHBaseState(AsyncHBaseClientFactory.getHBaseClient(conf, cluster));
     }
 }

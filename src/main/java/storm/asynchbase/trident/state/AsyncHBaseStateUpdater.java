@@ -9,13 +9,16 @@ import com.stumbleupon.async.Deferred;
 import org.hbase.async.PleaseThrottleException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import storm.asynchbase.trident.mapper.IAsyncHBaseTridentFieldMapper;
 import storm.asynchbase.trident.mapper.IAsyncHBaseTridentMapper;
 import storm.trident.operation.TridentCollector;
+import storm.trident.operation.TridentOperationContext;
 import storm.trident.state.BaseStateUpdater;
 import storm.trident.tuple.TridentTuple;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Update an AsyncHBaseState<br/>
@@ -23,6 +26,14 @@ import java.util.List;
  */
 public class AsyncHBaseStateUpdater extends BaseStateUpdater<AsyncHBaseState> {
     public static final Logger log = LoggerFactory.getLogger(AsyncHBaseStateUpdater.class);
+
+    @Override
+    public void prepare(Map conf, TridentOperationContext context) {
+        super.prepare(conf, context);
+        for (IAsyncHBaseTridentFieldMapper fieldMapper : mapper.getFieldMappers()) {
+            fieldMapper.prepare(conf);
+        }
+    }
 
     private final IAsyncHBaseTridentMapper mapper;
     private boolean throttle = false;
